@@ -6,12 +6,13 @@ import {
   TabTriggerSlotProps,
   TabListProps,
 } from 'expo-router/ui';
-import { Pressable, useColorScheme, View, StyleSheet } from 'react-native';
+import { Pressable, View, StyleSheet } from 'react-native';
 
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
-import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 export default function AppTabs() {
   return (
@@ -52,12 +53,12 @@ export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps
 }
 
 export function CustomTabList(props: TabListProps) {
-  useColorScheme();
+  const theme = useTheme();
 
   return (
     <View {...props} style={styles.tabListContainer}>
-      <ThemedView type="backgroundElement" style={styles.innerContainer}>
-        <ThemedText type="smallBold" style={styles.brandText}>
+      <ThemedView type="backgroundElement" style={[styles.innerContainer, { borderColor: theme.cardBorder }]}>
+        <ThemedText type="smallBold" style={[styles.brandText, { color: theme.primary }]}>
           Task Suite
         </ThemedText>
 
@@ -86,11 +87,9 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     maxWidth: MaxContentWidth,
     borderWidth: 1,
-    borderColor: 'rgba(15,118,110,0.14)',
   },
   brandText: {
     marginRight: 'auto',
-    color: Brand.primary,
   },
   pressed: {
     opacity: 0.7,

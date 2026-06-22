@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
-import { GlassView } from "expo-glass-effect";
 import { SymbolView } from "expo-symbols";
 import {
   ActivityIndicator,
@@ -9,6 +8,7 @@ import {
   StyleSheet,
 } from "react-native";
 
+import { AppCard } from "@/components/app-card";
 import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -89,7 +89,7 @@ export default function OverviewScreen() {
   return (
     <ScreenShell refreshing={refreshing} onRefresh={() => loadOverview(true)}>
       <ThemedView style={styles.container}>
-        <GlassView style={styles.heroCard}>
+        <AppCard variant="hero" style={styles.heroCard}>
           <ThemedText type="smallBold" themeColor="textSecondary">
             TASK SUITE
           </ThemedText>
@@ -101,7 +101,7 @@ export default function OverviewScreen() {
               ? `${profile.name}, here is the fastest read on your personal work and team assignments.`
               : "Loading your personal tasks, assigned work, and team nudges."}
           </ThemedText>
-        </GlassView>
+        </AppCard>
 
         {loading ? (
           <ThemedView style={styles.loadingWrap}>
@@ -110,46 +110,46 @@ export default function OverviewScreen() {
         ) : null}
 
         {error ? (
-          <GlassView style={styles.errorCard}>
+          <AppCard variant="soft" style={styles.errorCard}>
             <ThemedText type="smallBold">Workspace sync failed</ThemedText>
             <ThemedText themeColor="textSecondary">{error}</ThemedText>
             <Pressable onPress={() => loadOverview()} style={styles.inlineButton}>
               <ThemedText type="smallBold">Retry</ThemedText>
             </Pressable>
-          </GlassView>
+          </AppCard>
         ) : null}
 
         {profile ? (
           <ThemedView style={styles.metricGrid}>
-            <GlassView style={styles.metricCard}>
+            <AppCard style={styles.metricCard}>
               <ThemedText type="small" themeColor="textSecondary">
                 Completion rate
               </ThemedText>
               <ThemedText type="subtitle">{Math.round(profile.progress.completionRate)}%</ThemedText>
-            </GlassView>
-            <GlassView style={styles.metricCard}>
+            </AppCard>
+            <AppCard style={styles.metricCard}>
               <ThemedText type="small" themeColor="textSecondary">
                 On-time rate
               </ThemedText>
               <ThemedText type="subtitle">{Math.round(profile.progress.onTimeRate)}%</ThemedText>
-            </GlassView>
-            <GlassView style={styles.metricCard}>
+            </AppCard>
+            <AppCard style={styles.metricCard}>
               <ThemedText type="small" themeColor="textSecondary">
                 Assigned work
               </ThemedText>
               <ThemedText type="subtitle">{profile.progress.assignedTasks}</ThemedText>
-            </GlassView>
-            <GlassView style={styles.metricCard}>
+            </AppCard>
+            <AppCard style={styles.metricCard}>
               <ThemedText type="small" themeColor="textSecondary">
                 Teams
               </ThemedText>
               <ThemedText type="subtitle">{profile.identity.teams.length}</ThemedText>
-            </GlassView>
+            </AppCard>
           </ThemedView>
         ) : null}
 
         {profile?.progress.reminder ? (
-          <GlassView style={styles.reminderCard}>
+          <AppCard style={styles.reminderCard}>
             <SymbolView
               tintColor={Brand.warning}
               name={{ ios: "exclamationmark.triangle.fill", android: "warning" }}
@@ -161,7 +161,7 @@ export default function OverviewScreen() {
                 {profile.progress.reminder}
               </ThemedText>
             </ThemedView>
-          </GlassView>
+          </AppCard>
         ) : null}
 
         <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionLabel}>
@@ -177,7 +177,7 @@ export default function OverviewScreen() {
                     ? router.push({ pathname: "/team/[teamId]", params: { teamId: task.teamId } })
                     : null
                 }>
-                <GlassView style={styles.taskCard}>
+                <AppCard style={styles.taskCard}>
                   <ThemedView style={styles.taskRow}>
                     <ThemedView style={styles.taskCopy}>
                       <ThemedText>{task.title}</ThemedText>
@@ -187,16 +187,16 @@ export default function OverviewScreen() {
                     </ThemedView>
                     <ThemedText type="smallBold">{task.progressPercentage}%</ThemedText>
                   </ThemedView>
-                </GlassView>
+                </AppCard>
               </Pressable>
             ))
           ) : (
-            <GlassView style={styles.emptyCard}>
+            <AppCard variant="soft" style={styles.emptyCard}>
               <ThemedText>No team assignments right now.</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
                 Once teammates assign work, it will appear here.
               </ThemedText>
-            </GlassView>
+            </AppCard>
           )}
         </ThemedView>
 
@@ -206,7 +206,7 @@ export default function OverviewScreen() {
         <ThemedView style={styles.sectionStack}>
           {focusTasks.length ? (
             focusTasks.map((task) => (
-              <GlassView key={task.id} style={styles.taskCard}>
+              <AppCard key={task.id} style={styles.taskCard}>
                 <ThemedView style={styles.taskRow}>
                   <ThemedView style={styles.taskCopy}>
                     <ThemedText>{task.title}</ThemedText>
@@ -216,15 +216,15 @@ export default function OverviewScreen() {
                   </ThemedView>
                   <ThemedText type="smallBold">{task.progressPercentage}%</ThemedText>
                 </ThemedView>
-              </GlassView>
+              </AppCard>
             ))
           ) : (
-            <GlassView style={styles.emptyCard}>
+            <AppCard variant="soft" style={styles.emptyCard}>
               <ThemedText>No open personal tasks.</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
                 Add one from the My Tasks tab and it will show up here.
               </ThemedText>
-            </GlassView>
+            </AppCard>
           )}
         </ThemedView>
 
@@ -235,12 +235,12 @@ export default function OverviewScreen() {
             </ThemedText>
             <ThemedView style={styles.badgeWrap}>
               {profile.progress.badges.map((badge) => (
-                <GlassView key={badge.id} style={styles.badgeCard}>
+                <AppCard key={badge.id} variant="soft" style={styles.badgeCard}>
                   <ThemedText type="smallBold">{badge.title}</ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
                     {badge.description}
                   </ThemedText>
-                </GlassView>
+                </AppCard>
               ))}
             </ThemedView>
           </>

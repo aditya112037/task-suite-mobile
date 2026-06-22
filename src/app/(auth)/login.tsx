@@ -17,21 +17,18 @@ import { useRouter } from "expo-router";
 
 import { ThemedText } from "@/components/themed-text";
 import { Spacing } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
 import { login, register } from "@/services/auth";
 import { signInWithGoogle } from "@/services/googleAuth";
 import { useAuth } from "@/services/auth-context";
-
-const TEAL = "#0f766e";
-const AMBER = "#b08968";
-const CARD_BORDER = "rgba(238, 230, 220, 0.22)";
-const INPUT_BG = "rgba(255, 255, 255, 0.06)";
-const INPUT_BORDER = "rgba(255, 255, 255, 0.15)";
-const INPUT_FOCUS_BORDER = "rgba(15, 118, 110, 0.6)";
+import { useThemePreset } from "@/services/theme-context";
 
 export default function LoginScreen() {
   const router = useRouter();
   const { checkToken } = useAuth();
   const safeAreaInsets = useSafeAreaInsets();
+  const theme = useTheme();
+  const { activeThemeKey, availableThemes, setThemePreset } = useThemePreset();
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -80,7 +77,7 @@ export default function LoginScreen() {
   return (
     <View style={styles.root}>
       <LinearGradient
-        colors={["#07111d", "#0b1824"]}
+        colors={[...theme.pageGradient]}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
         style={StyleSheet.absoluteFill}
@@ -89,7 +86,7 @@ export default function LoginScreen() {
         style={[
           StyleSheet.absoluteFill,
           {
-            backgroundColor: "rgba(15, 118, 110, 0.26)",
+            backgroundColor: theme.pageGlowPrimary,
             borderRadius: 600,
             width: 500,
             height: 500,
@@ -103,7 +100,7 @@ export default function LoginScreen() {
         style={[
           StyleSheet.absoluteFill,
           {
-            backgroundColor: "rgba(176, 137, 104, 0.26)",
+            backgroundColor: theme.pageGlowSecondary,
             borderRadius: 600,
             width: 400,
             height: 400,
@@ -127,19 +124,35 @@ export default function LoginScreen() {
               { paddingTop: safeAreaInsets.top + Spacing.six + 20 },
             ]}
           >
-            <ThemedText
-              style={[styles.title, { color: TEAL }]}
-            >
+            <ThemedText style={[styles.eyebrow, { color: theme.secondary }]}>
+              TASK SUITE
+            </ThemedText>
+            <ThemedText style={[styles.title, { color: theme.primary }]}>
               {isRegister ? "Create Account" : "Welcome Back"}
+            </ThemedText>
+            <ThemedText style={[styles.subtitle, { color: theme.textSecondary }]}>
+              {isRegister
+                ? "Build your workspace with the same Task Suite flow as the web app."
+                : "Sign in to continue with your teams, tasks, reports, and mobile workspace."}
             </ThemedText>
 
             <GlassView
-              style={styles.card}
+              style={[
+                styles.card,
+                {
+                  borderColor: theme.cardBorder,
+                  backgroundColor: theme.heroSurface,
+                },
+              ]}
             >
               <Pressable
                 style={({ pressed }) => [
                   styles.googleButton,
-                  { opacity: pressed ? 0.8 : 1 },
+                  {
+                    opacity: pressed ? 0.8 : 1,
+                    borderColor: theme.cardBorder,
+                    backgroundColor: theme.backgroundElement,
+                  },
                 ]}
                 onPress={handleGoogleSignIn}
                 disabled={loading}
@@ -149,32 +162,32 @@ export default function LoginScreen() {
                     <ThemedText style={styles.googleG}>G</ThemedText>
                   </View>
                 </View>
-                <ThemedText style={styles.googleLabel}>
+                <ThemedText style={[styles.googleLabel, { color: theme.text }]}>
                   Continue with Google
                 </ThemedText>
               </Pressable>
 
               <View style={styles.divider}>
-                <View style={[styles.dividerLine, { backgroundColor: CARD_BORDER }]} />
-                <ThemedText style={styles.dividerText}>or</ThemedText>
-                <View style={[styles.dividerLine, { backgroundColor: CARD_BORDER }]} />
+                <View style={[styles.dividerLine, { backgroundColor: theme.divider }]} />
+                <ThemedText style={[styles.dividerText, { color: theme.textSecondary }]}>or</ThemedText>
+                <View style={[styles.dividerLine, { backgroundColor: theme.divider }]} />
               </View>
 
               {isRegister && (
                 <View style={styles.fieldGroup}>
-                  <ThemedText style={styles.label}>Full Name</ThemedText>
+                  <ThemedText style={[styles.label, { color: theme.textSecondary }]}>Full Name</ThemedText>
                   <TextInput
                     style={[
                       styles.input,
                       {
                         borderColor:
-                          focusedField === "name" ? INPUT_FOCUS_BORDER : INPUT_BORDER,
-                        backgroundColor: INPUT_BG,
-                        color: "#f4f1ff",
+                          focusedField === "name" ? theme.primary : theme.divider,
+                        backgroundColor: theme.backgroundElement,
+                        color: theme.text,
                       },
                     ]}
                     placeholder="Your name"
-                    placeholderTextColor="rgba(244, 241, 255, 0.4)"
+                    placeholderTextColor={theme.textSecondary}
                     value={name}
                     onChangeText={setName}
                     autoCapitalize="words"
@@ -185,19 +198,19 @@ export default function LoginScreen() {
               )}
 
               <View style={styles.fieldGroup}>
-                <ThemedText style={styles.label}>Email Address</ThemedText>
+                <ThemedText style={[styles.label, { color: theme.textSecondary }]}>Email Address</ThemedText>
                 <TextInput
                   style={[
                     styles.input,
                     {
                       borderColor:
-                        focusedField === "email" ? INPUT_FOCUS_BORDER : INPUT_BORDER,
-                      backgroundColor: INPUT_BG,
-                      color: "#f4f1ff",
+                        focusedField === "email" ? theme.primary : theme.divider,
+                      backgroundColor: theme.backgroundElement,
+                      color: theme.text,
                     },
                   ]}
                   placeholder="your@email.com"
-                  placeholderTextColor="rgba(244, 241, 255, 0.4)"
+                  placeholderTextColor={theme.textSecondary}
                   value={email}
                   onChangeText={setEmail}
                   autoCapitalize="none"
@@ -209,19 +222,19 @@ export default function LoginScreen() {
               </View>
 
               <View style={styles.fieldGroup}>
-                <ThemedText style={styles.label}>Password</ThemedText>
+                <ThemedText style={[styles.label, { color: theme.textSecondary }]}>Password</ThemedText>
                 <TextInput
                   style={[
                     styles.input,
                     {
                       borderColor:
-                        focusedField === "password" ? INPUT_FOCUS_BORDER : INPUT_BORDER,
-                      backgroundColor: INPUT_BG,
-                      color: "#f4f1ff",
+                        focusedField === "password" ? theme.primary : theme.divider,
+                      backgroundColor: theme.backgroundElement,
+                      color: theme.text,
                     },
                   ]}
                   placeholder="Enter your password"
-                  placeholderTextColor="rgba(244, 241, 255, 0.4)"
+                  placeholderTextColor={theme.textSecondary}
                   secureTextEntry
                   value={password}
                   onChangeText={setPassword}
@@ -234,7 +247,7 @@ export default function LoginScreen() {
               <Pressable
                 style={({ pressed }) => [
                   styles.submitButton,
-                  { backgroundColor: TEAL, opacity: pressed || loading ? 0.8 : 1 },
+                  { backgroundColor: theme.primary, opacity: pressed || loading ? 0.8 : 1 },
                 ]}
                 onPress={handleSubmit}
                 disabled={loading}
@@ -249,12 +262,40 @@ export default function LoginScreen() {
               </Pressable>
             </GlassView>
 
+            <View style={styles.themeWrap}>
+              <ThemedText style={[styles.themeLabel, { color: theme.textSecondary }]}>Theme</ThemedText>
+              <View style={styles.themeRow}>
+                {availableThemes.map((themeOption) => {
+                  const selected = themeOption.key === activeThemeKey;
+
+                  return (
+                    <Pressable
+                      key={themeOption.key}
+                      onPress={() => setThemePreset(themeOption.key)}
+                      style={[
+                        styles.themeChip,
+                        {
+                          backgroundColor: selected ? theme.backgroundSelected : theme.backgroundElement,
+                          borderColor: selected ? theme.primary : theme.cardBorder,
+                        },
+                      ]}>
+                      <ThemedText
+                        type="smallBold"
+                        style={{ color: selected ? theme.primary : theme.textSecondary }}>
+                        {themeOption.label}
+                      </ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
             <View style={styles.footer}>
-              <ThemedText style={styles.footerText}>
+              <ThemedText style={[styles.footerText, { color: theme.textSecondary }]}>
                 {isRegister ? "Already have an account?" : "New here?"}
               </ThemedText>
               <Pressable onPress={() => setIsRegister(!isRegister)}>
-                <ThemedText style={[styles.footerLink, { color: AMBER }]}>
+                <ThemedText style={[styles.footerLink, { color: theme.secondary }]}>
                   {isRegister ? "Login" : "Create account"}
                 </ThemedText>
               </Pressable>
@@ -285,14 +326,26 @@ const styles = StyleSheet.create({
     fontSize: 34,
     fontWeight: "bold",
     textAlign: "center",
+  },
+  eyebrow: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 2.2,
+    marginBottom: Spacing.one,
+  },
+  subtitle: {
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: "center",
+    marginTop: Spacing.one,
     marginBottom: Spacing.four,
+    maxWidth: 420,
   },
   card: {
     width: "100%",
     maxWidth: 400,
-    borderRadius: 12,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: CARD_BORDER,
     padding: Spacing.four,
     gap: Spacing.three,
   },
@@ -302,10 +355,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 12,
     borderWidth: 1,
-    borderColor: CARD_BORDER,
-    borderRadius: 8,
+    borderRadius: 14,
     paddingVertical: 14,
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
   },
   googleIconContainer: {
     width: 20,
@@ -345,7 +396,6 @@ const styles = StyleSheet.create({
   },
   dividerText: {
     fontSize: 13,
-    color: "rgba(244, 241, 255, 0.5)",
     fontWeight: "600",
   },
   fieldGroup: {
@@ -353,19 +403,18 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    color: "rgba(244, 241, 255, 0.7)",
     fontWeight: "500",
     marginLeft: 2,
   },
   input: {
-    borderRadius: 8,
+    borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: Platform.OS === "ios" ? 14 : 12,
     fontSize: 16,
   },
   submitButton: {
-    borderRadius: 8,
+    borderRadius: 14,
     paddingVertical: 14,
     alignItems: "center",
     justifyContent: "center",
@@ -380,6 +429,8 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    flexWrap: "wrap",
     gap: 6,
     paddingTop: Spacing.four,
     paddingBottom: Spacing.five,
@@ -391,5 +442,29 @@ const styles = StyleSheet.create({
   footerLink: {
     fontSize: 14,
     fontWeight: "700",
+  },
+  themeWrap: {
+    width: "100%",
+    maxWidth: 460,
+    gap: Spacing.two,
+    marginTop: Spacing.three,
+  },
+  themeLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    textAlign: "center",
+    letterSpacing: 1,
+  },
+  themeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: Spacing.two,
+  },
+  themeChip: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: 999,
+    borderWidth: 1,
   },
 });

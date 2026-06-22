@@ -48,6 +48,14 @@ export type TeamMember = {
   teamDisplayName?: string;
 };
 
+export type PendingJoinRequest = {
+  id: string;
+  name: string;
+  email?: string;
+  photo?: string | null;
+  requestedAt: string | null;
+};
+
 export type TeamSummary = {
   id: string;
   name: string;
@@ -64,6 +72,7 @@ export type TeamSummary = {
 export type TeamDetail = TeamSummary & {
   members: TeamMember[];
   roles: TeamRole[];
+  pendingJoinRequests: PendingJoinRequest[];
 };
 
 export type TeamTask = {
@@ -289,6 +298,16 @@ export const normalizeTeamDetail = (raw: RawRecord, currentUserId: string): Team
     ...summary,
     members,
     roles: readArray<RawRecord>(raw.roles).map(normalizeRole),
+    pendingJoinRequests: readArray<RawRecord>(raw.pendingJoinRequests).map((request) => {
+      const user = (request.user || {}) as RawRecord;
+      return {
+        id: toId(user),
+        name: readString(user.name, "Pending user"),
+        email: readString(user.email),
+        photo: user.photo ? readString(user.photo) : null,
+        requestedAt: request.requestedAt ? readString(request.requestedAt) : null,
+      };
+    }),
   };
 };
 

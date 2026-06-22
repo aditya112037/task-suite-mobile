@@ -17,12 +17,14 @@ import { Brand, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { getProfile } from "@/services/profile";
 import {
+  approveJoinRequest,
   getConferenceStatus,
   getTeam,
   getTeamAttendance,
   getInviteLink,
   punchIn,
   punchOut,
+  rejectJoinRequest,
   type TeamDetail,
   type TeamAttendance,
 } from "@/services/teams";
@@ -62,6 +64,7 @@ export default function TeamDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [reviewingJoinRequestFor, setReviewingJoinRequestFor] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const myAttendance = useMemo(() => {
@@ -76,6 +79,7 @@ export default function TeamDetailsScreen() {
   const canCreateTask = team?.myPowers.includes("create_task") || team?.isAdmin;
   const canAssignTask = team?.myPowers.includes("assign_task") || team?.isAdmin;
   const canApproveExtensions = team?.myPowers.includes("approve_extensions") || team?.isAdmin;
+  const canReviewJoinRequests = team?.myPowers.includes("manage_join_requests") || team?.isAdmin;
 
   const loadTeamWorkspace = useCallback(
     async (isRefresh = false) => {
@@ -206,6 +210,28 @@ export default function TeamDetailsScreen() {
       setPendingExtensions((currentTasks) => currentTasks.filter((entry) => entry.id !== task.id));
     } catch (err) {
       Alert.alert("Could not review extension", err instanceof Error ? err.message : "Unknown error");
+    }
+  }
+
+  async function handleJoinRequestReview(userId: string, decision: "approve" | "reject") {
+    if (!teamId) return;
+
+    try {
+      setReviewingJoinRequestFor(userId);
+      if (decision === "approve") {
+        await approveJoinRequest(teamId, userId);
+      } else {
+        await rejectJoinRequest(teamId, userId);
+      }
+
+      await loadTeamWorkspace(true);
+    } catch (err) {
+      Alert.alert(
+        "Could not review join request",
+        err instanceof Error ? err.message : "Unknown error"
+      );
+    } finally {
+      setReviewingJoinRequestFor("");
     }
   }
 
@@ -357,6 +383,57 @@ export default function TeamDetailsScreen() {
               Team Members
             </ThemedText>
             <ThemedView style={styles.stack}>
+              {canReviewJoinRequests && team.pendingJoinRequests.length ? (
+                <GlassView style={styles.sectionCard}>
+                  <ThemedText type="smallBold">Pending Join Requests</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Review teammates asking to join this workspace.
+                  </ThemedText>
+                  <ThemedView style={styles.stack}>
+                    {team.pendingJoinRequests.map((request) => {
+                      const isReviewing = reviewingJoinRequestFor === request.id;
+
+                      return (
+                        <GlassView key={request.id} style={styles.taskCard}>
+                          <ThemedView style={styles.taskTopRow}>
+                            <ThemedView style={styles.taskCopy}>
+                              <ThemedText>{request.name}</ThemedText>
+                              <ThemedText type="small" themeColor="textSecondary">
+                                {request.email || "No email"}
+                              </ThemedText>
+                              <ThemedText type="small" themeColor="textSecondary">
+                                Requested{" "}
+                                {request.requestedAt
+                                  ? new Date(request.requestedAt).toLocaleString()
+                                  : "recently"}
+                              </ThemedText>
+                            </ThemedView>
+                          </ThemedView>
+                          <ThemedView style={styles.actionsRow}>
+                            <Pressable
+                              onPress={() => handleJoinRequestReview(request.id, "approve")}
+                              disabled={Boolean(reviewingJoinRequestFor)}
+                              style={[styles.inlineButton, styles.primaryButton]}>
+                              <ThemedText type="smallBold" style={styles.primaryButtonText}>
+                                {isReviewing ? "Working..." : "Approve"}
+                              </ThemedText>
+                            </Pressable>
+                            <Pressable
+                              onPress={() => handleJoinRequestReview(request.id, "reject")}
+                              disabled={Boolean(reviewingJoinRequestFor)}
+                              style={styles.inlineButton}>
+                              <ThemedText type="smallBold" themeColor="textSecondary">
+                                Reject
+                              </ThemedText>
+                            </Pressable>
+                          </ThemedView>
+                        </GlassView>
+                      );
+                    })}
+                  </ThemedView>
+                </GlassView>
+              ) : null}
+
               {team.members.map((member) => (
                 <GlassView key={member.id} style={styles.taskCard}>
                   <ThemedView style={styles.taskTopRow}>

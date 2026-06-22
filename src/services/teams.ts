@@ -43,6 +43,24 @@ export async function getInviteLink(teamId: string) {
   });
 }
 
+export async function approveJoinRequest(teamId: string, userId: string) {
+  const payload = await apiRequest<TeamPayload>(`/api/teams/${teamId}/join-requests/${userId}/approve`, {
+    method: "POST",
+    auth: true,
+  });
+
+  return payload;
+}
+
+export async function rejectJoinRequest(teamId: string, userId: string) {
+  const payload = await apiRequest<TeamPayload>(`/api/teams/${teamId}/join-requests/${userId}/reject`, {
+    method: "POST",
+    auth: true,
+  });
+
+  return payload;
+}
+
 export async function getTeam(teamId: string, currentUserId: string) {
   const payload = await apiRequest<TeamPayload>(`/api/teams/${teamId}/details`, {
     auth: true,

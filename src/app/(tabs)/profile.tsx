@@ -9,10 +9,12 @@ import { Brand, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/services/auth-context";
 import { getProfile, type ProfileSummary } from "@/services/profile";
+import { useThemePreset } from "@/services/theme-context";
 
 export default function ProfileScreen() {
   const theme = useTheme();
   const { signOut } = useAuth();
+  const { activeThemeKey, availableThemes, setThemePreset } = useThemePreset();
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -118,6 +120,33 @@ export default function ProfileScreen() {
               ))}
             </ThemedView>
 
+            <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionLabel}>
+              App Theme
+            </ThemedText>
+            <ThemedView style={styles.themeGrid}>
+              {availableThemes.map((themeOption) => {
+                const isSelected = themeOption.key === activeThemeKey;
+
+                return (
+                  <Pressable
+                    key={themeOption.key}
+                    onPress={() => setThemePreset(themeOption.key)}
+                    style={[
+                      styles.themeCard,
+                      {
+                        backgroundColor: isSelected ? theme.backgroundSelected : theme.backgroundElement,
+                        borderColor: isSelected ? theme.primary : theme.divider,
+                      },
+                    ]}>
+                    <ThemedText type="smallBold">{themeOption.label}</ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {isSelected ? "Active on this device" : "Tap to switch"}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </ThemedView>
+
             <Pressable
               onPress={async () => {
                 await signOut();
@@ -176,6 +205,15 @@ const styles = StyleSheet.create({
   },
   sectionStack: {
     gap: Spacing.two,
+  },
+  themeGrid: {
+    gap: Spacing.two,
+  },
+  themeCard: {
+    padding: Spacing.three,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 4,
   },
   teamCard: {
     padding: Spacing.three,
