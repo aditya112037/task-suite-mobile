@@ -1,34 +1,92 @@
-import { useEffect } from 'react';
-import { GlassView } from 'expo-glass-effect';
-import { SymbolView } from 'expo-symbols';
-import { ScrollView, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { GlassView } from "expo-glass-effect";
+import { SymbolView } from "expo-symbols";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { testConnection } from '@/services/api';
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { BottomTabInset, MaxContentWidth, Spacing } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
+import { useAuth } from "@/services/auth-context";
+import { getProfile, type ProfileSummary } from "@/services/profile";
+import { getTasks, type PersonalTask } from "@/services/tasks";
+import { getMyTeamTasks, type TeamTask } from "@/services/team-tasks";
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+function formatShortDate(value: string | null) {
+  if (!value) return "No due date";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "No due date";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
-const TASKS = [
-  { id: '1', title: 'Finish Marketing Video', done: false },
-  { id: '2', title: 'Contact Leads', done: false },
-  { id: '3', title: 'Update Website', done: false },
-];
-
-export default function TodayScreen() {
+export default function OverviewScreen() {
   const safeAreaInsets = useSafeAreaInsets();
   const theme = useTheme();
+  const { signOut } = useAuth();
+  const [profile, setProfile] = useState<ProfileSummary | null>(null);
+  const [personalTasks, setPersonalTasks] = useState<PersonalTask[]>([]);
+  const [teamTasks, setTeamTasks] = useState<TeamTask[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const assignedTasks = useMemo(() => {
+    if (!profile) return [];
+    return teamTasks.filter((task) => task.assigneeIds.includes(profile.id));
+  }, [profile, teamTasks]);
+
+  const focusTasks = useMemo(
+    () => personalTasks.filter((task) => task.status !== "completed").slice(0, 3),
+    [personalTasks]
+  );
+
+  const loadOverview = useCallback(
+    async (isRefresh = false) => {
+      try {
+        if (isRefresh) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
+
+        const nextProfile = await getProfile();
+        const [nextPersonalTasks, nextTeamTasks] = await Promise.all([getTasks(), getMyTeamTasks()]);
+
+        setProfile(nextProfile);
+        setPersonalTasks(nextPersonalTasks);
+        setTeamTasks(nextTeamTasks);
+        setError(null);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to load your workspace";
+        setError(message);
+
+        if (message.toLowerCase().includes("session") || message.toLowerCase().includes("authorized")) {
+          await signOut();
+          Alert.alert("Session expired", "Please sign in again.");
+        }
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [signOut]
+  );
 
   useEffect(() => {
-    async function check() {
-      const data = await testConnection();
-      console.log(data);
-    }
+    const timer = setTimeout(() => {
+      void loadOverview();
+    }, 0);
 
-    check();
-  }, []);
+    return () => clearTimeout(timer);
+  }, [loadOverview]);
 
   const insets = {
     ...safeAreaInsets,
@@ -39,98 +97,252 @@ export default function TodayScreen() {
     <ScrollView
       style={[styles.scrollView, { backgroundColor: theme.background }]}
       contentInset={insets}
-      contentContainerStyle={styles.contentContainer}>
+      contentContainerStyle={styles.contentContainer}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}>
       <ThemedView style={styles.container}>
-        <ThemedView style={styles.hero}>
-          <SymbolView
-            tintColor={theme.text}
-            name={{ ios: 'sun.max.fill', android: 'light_mode' }}
-            size={32}
-          />
-          <ThemedText type="subtitle" style={styles.greeting}>
-            Good Morning
+        <GlassView style={styles.heroCard}>
+          <ThemedText type="smallBold" themeColor="textSecondary">
+            TASK SUITE
           </ThemedText>
-          <GlassView style={styles.badge}>
-            <SymbolView
-              tintColor={theme.textSecondary}
-              name={{ ios: 'list.bullet.clipboard', android: 'assignment' }}
-              size={14}
-            />
-            <ThemedText type="smallBold" themeColor="textSecondary">
-              {TASKS.length} Tasks Due
-            </ThemedText>
+          <ThemedText type="subtitle" style={styles.heroTitle}>
+            {profile ? `Keep ${profile.progress.activeTasks} active threads moving.` : "Your mobile command deck."}
+          </ThemedText>
+          <ThemedText themeColor="textSecondary">
+            {profile
+              ? `${profile.name}, here is the fastest read on your personal work and team assignments.`
+              : "Loading your personal tasks, assigned work, and team nudges."}
+          </ThemedText>
+        </GlassView>
+
+        {loading ? (
+          <ThemedView style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color={theme.textSecondary} />
+          </ThemedView>
+        ) : null}
+
+        {error ? (
+          <GlassView style={styles.errorCard}>
+            <ThemedText type="smallBold">Workspace sync failed</ThemedText>
+            <ThemedText themeColor="textSecondary">{error}</ThemedText>
+            <Pressable onPress={() => loadOverview()} style={styles.inlineButton}>
+              <ThemedText type="smallBold">Retry</ThemedText>
+            </Pressable>
           </GlassView>
+        ) : null}
+
+        {profile ? (
+          <ThemedView style={styles.metricGrid}>
+            <GlassView style={styles.metricCard}>
+              <ThemedText type="small" themeColor="textSecondary">
+                Completion rate
+              </ThemedText>
+              <ThemedText type="subtitle">{Math.round(profile.progress.completionRate)}%</ThemedText>
+            </GlassView>
+            <GlassView style={styles.metricCard}>
+              <ThemedText type="small" themeColor="textSecondary">
+                On-time rate
+              </ThemedText>
+              <ThemedText type="subtitle">{Math.round(profile.progress.onTimeRate)}%</ThemedText>
+            </GlassView>
+            <GlassView style={styles.metricCard}>
+              <ThemedText type="small" themeColor="textSecondary">
+                Assigned work
+              </ThemedText>
+              <ThemedText type="subtitle">{profile.progress.assignedTasks}</ThemedText>
+            </GlassView>
+            <GlassView style={styles.metricCard}>
+              <ThemedText type="small" themeColor="textSecondary">
+                Teams
+              </ThemedText>
+              <ThemedText type="subtitle">{profile.identity.teams.length}</ThemedText>
+            </GlassView>
+          </ThemedView>
+        ) : null}
+
+        {profile?.progress.reminder ? (
+          <GlassView style={styles.reminderCard}>
+            <SymbolView
+              tintColor="#f7a83c"
+              name={{ ios: "exclamationmark.triangle.fill", android: "warning" }}
+              size={18}
+            />
+            <ThemedView style={styles.reminderCopy}>
+              <ThemedText type="smallBold">Needs attention</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                {profile.progress.reminder}
+              </ThemedText>
+            </ThemedView>
+          </GlassView>
+        ) : null}
+
+        <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionLabel}>
+          Assigned Work
+        </ThemedText>
+        <ThemedView style={styles.sectionStack}>
+          {assignedTasks.length ? (
+            assignedTasks.slice(0, 3).map((task) => (
+              <GlassView key={task.id} style={styles.taskCard}>
+                <ThemedView style={styles.taskRow}>
+                  <ThemedView style={styles.taskCopy}>
+                    <ThemedText>{task.title}</ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {task.teamName} • {task.status.replace("-", " ")}
+                    </ThemedText>
+                  </ThemedView>
+                  <ThemedText type="smallBold">{task.progressPercentage}%</ThemedText>
+                </ThemedView>
+              </GlassView>
+            ))
+          ) : (
+            <GlassView style={styles.emptyCard}>
+              <ThemedText>No team assignments right now.</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                Once teammates assign work, it will appear here.
+              </ThemedText>
+            </GlassView>
+          )}
         </ThemedView>
 
         <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionLabel}>
-          Today's Tasks
+          Personal Focus
         </ThemedText>
-
-        <ThemedView style={styles.taskList}>
-          {TASKS.map((task) => (
-            <GlassView key={task.id} style={styles.taskItem}>
-              <SymbolView
-                tintColor={theme.textSecondary}
-                name={{ ios: 'circle', android: 'radio_button_unchecked' }}
-                size={22}
-              />
-              <ThemedText style={styles.taskTitle}>{task.title}</ThemedText>
+        <ThemedView style={styles.sectionStack}>
+          {focusTasks.length ? (
+            focusTasks.map((task) => (
+              <GlassView key={task.id} style={styles.taskCard}>
+                <ThemedView style={styles.taskRow}>
+                  <ThemedView style={styles.taskCopy}>
+                    <ThemedText>{task.title}</ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {task.priority} priority • due {formatShortDate(task.dueDate)}
+                    </ThemedText>
+                  </ThemedView>
+                  <ThemedText type="smallBold">{task.progressPercentage}%</ThemedText>
+                </ThemedView>
+              </GlassView>
+            ))
+          ) : (
+            <GlassView style={styles.emptyCard}>
+              <ThemedText>No open personal tasks.</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                Add one from the My Tasks tab and it will show up here.
+              </ThemedText>
             </GlassView>
-          ))}
+          )}
         </ThemedView>
+
+        {profile?.progress.badges.length ? (
+          <>
+            <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionLabel}>
+              Momentum
+            </ThemedText>
+            <ThemedView style={styles.badgeWrap}>
+              {profile.progress.badges.map((badge) => (
+                <GlassView key={badge.id} style={styles.badgeCard}>
+                  <ThemedText type="smallBold">{badge.title}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {badge.description}
+                  </ThemedText>
+                </GlassView>
+              ))}
+            </ThemedView>
+          </>
+        ) : null}
       </ThemedView>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollView: {
-    flex: 1,
-  },
+  scrollView: { flex: 1 },
   contentContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
   },
   container: {
     maxWidth: MaxContentWidth,
     flexGrow: 1,
     paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.six,
+    paddingTop: Spacing.five,
+    gap: Spacing.three,
   },
-  hero: {
+  heroCard: {
+    padding: Spacing.four,
+    borderRadius: 28,
     gap: Spacing.two,
-    marginBottom: Spacing.five,
   },
-  greeting: {
-    fontSize: 36,
-    lineHeight: 44,
+  heroTitle: {
+    fontSize: 34,
+    lineHeight: 40,
   },
-  badge: {
-    flexDirection: 'row',
-    alignSelf: 'flex-start',
-    alignItems: 'center',
+  loadingWrap: {
+    paddingVertical: Spacing.five,
+  },
+  metricGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.three,
+  },
+  metricCard: {
+    minWidth: "47%",
+    flexGrow: 1,
+    padding: Spacing.three,
+    borderRadius: 22,
     gap: Spacing.one,
+  },
+  reminderCard: {
+    flexDirection: "row",
+    gap: Spacing.two,
+    padding: Spacing.three,
+    borderRadius: 22,
+    alignItems: "flex-start",
+  },
+  reminderCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  errorCard: {
+    padding: Spacing.three,
+    borderRadius: 20,
+    gap: Spacing.two,
+  },
+  inlineButton: {
+    alignSelf: "flex-start",
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one + 2,
-    borderRadius: Spacing.five,
+    paddingVertical: Spacing.one,
   },
   sectionLabel: {
-    marginBottom: Spacing.three,
-    textTransform: 'uppercase',
+    marginTop: Spacing.one,
+    textTransform: "uppercase",
     letterSpacing: 1,
   },
-  taskList: {
+  sectionStack: {
     gap: Spacing.two,
   },
-  taskItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three + 2,
-    borderRadius: Spacing.three,
+  taskCard: {
+    padding: Spacing.three,
+    borderRadius: 20,
   },
-  taskTitle: {
+  taskRow: {
+    flexDirection: "row",
+    gap: Spacing.three,
+    alignItems: "center",
+  },
+  taskCopy: {
     flex: 1,
+    gap: 4,
+  },
+  emptyCard: {
+    padding: Spacing.four,
+    borderRadius: 20,
+    gap: Spacing.one,
+  },
+  badgeWrap: {
+    gap: Spacing.two,
+  },
+  badgeCard: {
+    padding: Spacing.three,
+    borderRadius: 20,
+    gap: 4,
   },
 });

@@ -1,40 +1,44 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { apiRequest } from "@/services/api";
+import { normalizePersonalTask, type PersonalTask } from "@/services/contracts";
 
-const API_URL = "https://task-manager-8vth.onrender.com";
-
-async function authHeaders() {
-  const token = await AsyncStorage.getItem("token");
-
-  return {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
-  };
-}
+type PersonalTaskPayload = Record<string, unknown>;
 
 export async function getTasks() {
-  const response = await fetch(`${API_URL}/api/tasks`, {
-    headers: await authHeaders(),
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to load tasks");
-  }
-
-  return response.json();
+  const payload = await apiRequest<PersonalTaskPayload[]>("/api/tasks", { auth: true });
+  return payload.map(normalizePersonalTask);
 }
 
-export async function createTask(title: string) {
-  const response = await fetch(`${API_URL}/api/tasks`, {
+export async function createTask(data: {
+  title: string;
+  description?: string;
+  priority?: string;
+  dueDate?: string | null;
+  workspace?: string;
+}) {
+  const payload = await apiRequest<PersonalTaskPayload>("/api/tasks", {
     method: "POST",
-    headers: await authHeaders(),
-    body: JSON.stringify({
-      title,
-    }),
+    auth: true,
+    body: JSON.stringify(data),
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to create task");
-  }
-
-  return response.json();
+  return normalizePersonalTask(payload);
 }
+
+export async function updateTask(taskId: string, data: Record<string, unknown>) {
+  const payload = await apiRequest<PersonalTaskPayload>(`/api/tasks/${taskId}`, {
+    method: "PUT",
+    auth: true,
+    body: JSON.stringify(data),
+  });
+
+  return normalizePersonalTask(payload);
+}
+
+export async function deleteTask(taskId: string) {
+  return apiRequest(`/api/tasks/${taskId}`, {
+    method: "DELETE",
+    auth: true,
+  });
+}
+
+export type { PersonalTask };

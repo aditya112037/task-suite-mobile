@@ -1,7 +1,5 @@
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import { Redirect } from 'expo-router';
-import { useColorScheme } from 'react-native';
+import { ActivityIndicator, StyleSheet, View, useColorScheme } from 'react-native';
+import { DarkTheme, DefaultTheme, Redirect, ThemeProvider } from 'expo-router';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppTabs from '@/components/app-tabs';

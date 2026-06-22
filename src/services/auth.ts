@@ -1,57 +1,46 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 
-const API_URL = "https://task-manager-8vth.onrender.com";
+import { TOKEN_STORAGE_KEY, apiRequest, clearStoredToken } from "@/services/api";
+
+type AuthResponse = {
+  token: string;
+  name?: string;
+  email?: string;
+};
 
 export async function login(email: string, password: string) {
-  const response = await fetch(`${API_URL}/api/auth/login`, {
+  const data = await apiRequest<AuthResponse>("/api/auth/login", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify({ email, password }),
   });
 
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || "Login failed");
-  }
-
-  await AsyncStorage.setItem("token", data.token);
+  await AsyncStorage.setItem(TOKEN_STORAGE_KEY, data.token);
 
   return data;
 }
 
 export async function register(name: string, email: string, password: string) {
-  const response = await fetch(`${API_URL}/api/auth/register`, {
+  const data = await apiRequest<AuthResponse>("/api/auth/register", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify({ name, email, password }),
   });
 
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || "Registration failed");
-  }
-
-  await AsyncStorage.setItem("token", data.token);
+  await AsyncStorage.setItem(TOKEN_STORAGE_KEY, data.token);
 
   return data;
 }
 
 export async function getToken() {
-  return AsyncStorage.getItem("token");
+  return AsyncStorage.getItem(TOKEN_STORAGE_KEY);
 }
 
 export async function logout() {
   try {
     await GoogleSignin.signOut();
   } catch {
-    // Not signed in with Google — that's fine
+    // Not signed in with Google - that's fine.
   }
-  await AsyncStorage.removeItem("token");
+
+  await clearStoredToken();
 }
