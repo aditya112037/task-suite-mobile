@@ -55,4 +55,22 @@ export async function getPendingExtensions(teamId: string) {
   return payload.map(normalizeTeamTask);
 }
 
+export async function approveExtension(taskId: string) {
+  const payload = await apiRequest<TeamTaskPayload>(`/api/team-tasks/${taskId}/extension/approve`, {
+    method: "POST",
+    auth: true,
+  });
+
+  return normalizeTeamTask(payload);
+}
+
+export async function rejectExtension(taskId: string) {
+  const payload = await apiRequest<TeamTaskPayload>(`/api/team-tasks/${taskId}/extension/reject`, {
+    method: "POST",
+    auth: true,
+  });
+
+  return normalizeTeamTask(payload);
+}
+
 export type { TeamTask };

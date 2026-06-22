@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { router } from "expo-router";
 import { GlassView } from "expo-glass-effect";
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput } from "react-native";
 
+import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { BottomTabInset, MaxContentWidth, Spacing } from "@/constants/theme";
+import { Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/services/auth-context";
 import { getProfile } from "@/services/profile";
@@ -27,7 +27,6 @@ function extractInviteCode(value: string) {
 }
 
 export default function TeamsScreen() {
-  const safeAreaInsets = useSafeAreaInsets();
   const theme = useTheme();
   const { signOut } = useAuth();
   const [teams, setTeams] = useState<TeamSummary[]>([]);
@@ -127,17 +126,8 @@ export default function TeamsScreen() {
     }
   }
 
-  const insets = {
-    ...safeAreaInsets,
-    bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
-  };
-
   return (
-    <ScrollView
-      style={[styles.scrollView, { backgroundColor: theme.background }]}
-      contentInset={insets}
-      contentContainerStyle={styles.contentContainer}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadTeams(true)} />}>
+    <ScreenShell refreshing={refreshing} onRefresh={() => loadTeams(true)}>
       <ThemedView style={styles.container}>
         <ThemedView style={styles.header}>
           <ThemedText type="subtitle" style={styles.headerTitle}>
@@ -272,21 +262,12 @@ export default function TeamsScreen() {
           )}
         </ThemedView>
       </ThemedView>
-    </ScrollView>
+    </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollView: { flex: 1 },
-  contentContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-  },
   container: {
-    maxWidth: MaxContentWidth,
-    flexGrow: 1,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.five,
     gap: Spacing.three,
   },
   header: { gap: Spacing.one },
@@ -295,6 +276,8 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
     borderRadius: 24,
     gap: Spacing.three,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
   },
   input: {
     borderWidth: 1,

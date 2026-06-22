@@ -1,19 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { router } from "expo-router";
 import { GlassView } from "expo-glass-effect";
 import { SymbolView } from "expo-symbols";
 import {
   ActivityIndicator,
   Alert,
   Pressable,
-  RefreshControl,
-  ScrollView,
   StyleSheet,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { BottomTabInset, MaxContentWidth, Spacing } from "@/constants/theme";
+import { Brand, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/services/auth-context";
 import { getProfile, type ProfileSummary } from "@/services/profile";
@@ -28,7 +27,6 @@ function formatShortDate(value: string | null) {
 }
 
 export default function OverviewScreen() {
-  const safeAreaInsets = useSafeAreaInsets();
   const theme = useTheme();
   const { signOut } = useAuth();
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
@@ -88,17 +86,8 @@ export default function OverviewScreen() {
     return () => clearTimeout(timer);
   }, [loadOverview]);
 
-  const insets = {
-    ...safeAreaInsets,
-    bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
-  };
-
   return (
-    <ScrollView
-      style={[styles.scrollView, { backgroundColor: theme.background }]}
-      contentInset={insets}
-      contentContainerStyle={styles.contentContainer}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} />}>
+    <ScreenShell refreshing={refreshing} onRefresh={() => loadOverview(true)}>
       <ThemedView style={styles.container}>
         <GlassView style={styles.heroCard}>
           <ThemedText type="smallBold" themeColor="textSecondary">
@@ -162,7 +151,7 @@ export default function OverviewScreen() {
         {profile?.progress.reminder ? (
           <GlassView style={styles.reminderCard}>
             <SymbolView
-              tintColor="#f7a83c"
+              tintColor={Brand.warning}
               name={{ ios: "exclamationmark.triangle.fill", android: "warning" }}
               size={18}
             />
@@ -181,17 +170,25 @@ export default function OverviewScreen() {
         <ThemedView style={styles.sectionStack}>
           {assignedTasks.length ? (
             assignedTasks.slice(0, 3).map((task) => (
-              <GlassView key={task.id} style={styles.taskCard}>
-                <ThemedView style={styles.taskRow}>
-                  <ThemedView style={styles.taskCopy}>
-                    <ThemedText>{task.title}</ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {task.teamName} • {task.status.replace("-", " ")}
-                    </ThemedText>
+              <Pressable
+                key={task.id}
+                onPress={() =>
+                  task.teamId
+                    ? router.push({ pathname: "/team/[teamId]", params: { teamId: task.teamId } })
+                    : null
+                }>
+                <GlassView style={styles.taskCard}>
+                  <ThemedView style={styles.taskRow}>
+                    <ThemedView style={styles.taskCopy}>
+                      <ThemedText>{task.title}</ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {task.teamName} • {task.status.replace("-", " ")}
+                      </ThemedText>
+                    </ThemedView>
+                    <ThemedText type="smallBold">{task.progressPercentage}%</ThemedText>
                   </ThemedView>
-                  <ThemedText type="smallBold">{task.progressPercentage}%</ThemedText>
-                </ThemedView>
-              </GlassView>
+                </GlassView>
+              </Pressable>
             ))
           ) : (
             <GlassView style={styles.emptyCard}>
@@ -249,27 +246,20 @@ export default function OverviewScreen() {
           </>
         ) : null}
       </ThemedView>
-    </ScrollView>
+    </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollView: { flex: 1 },
-  contentContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-  },
   container: {
-    maxWidth: MaxContentWidth,
-    flexGrow: 1,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.five,
     gap: Spacing.three,
   },
   heroCard: {
     padding: Spacing.four,
     borderRadius: 28,
     gap: Spacing.two,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
   },
   heroTitle: {
     fontSize: 34,
@@ -296,6 +286,8 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     borderRadius: 22,
     alignItems: "flex-start",
+    borderWidth: 1,
+    borderColor: "rgba(247, 168, 60, 0.18)",
   },
   reminderCopy: {
     flex: 1,

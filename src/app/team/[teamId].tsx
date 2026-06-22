@@ -5,16 +5,15 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  RefreshControl,
-  ScrollView,
+  Share,
   StyleSheet,
   TextInput,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { MaxContentWidth, Spacing } from "@/constants/theme";
+import { Brand, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { getProfile } from "@/services/profile";
 import {
@@ -28,9 +27,11 @@ import {
   type TeamAttendance,
 } from "@/services/teams";
 import {
+  approveExtension,
   createTeamTask,
   getPendingExtensions,
   getTeamTasks,
+  rejectExtension,
   updateTeamTask,
   type TeamTask,
 } from "@/services/team-tasks";
@@ -45,7 +46,6 @@ function getDateKey() {
 
 export default function TeamDetailsScreen() {
   const { teamId } = useLocalSearchParams<{ teamId: string }>();
-  const safeAreaInsets = useSafeAreaInsets();
   const theme = useTheme();
   const [team, setTeam] = useState<TeamDetail | null>(null);
   const [attendance, setAttendance] = useState<TeamAttendance | null>(null);
@@ -75,6 +75,7 @@ export default function TeamDetailsScreen() {
 
   const canCreateTask = team?.myPowers.includes("create_task") || team?.isAdmin;
   const canAssignTask = team?.myPowers.includes("assign_task") || team?.isAdmin;
+  const canApproveExtensions = team?.myPowers.includes("approve_extensions") || team?.isAdmin;
 
   const loadTeamWorkspace = useCallback(
     async (isRefresh = false) => {
@@ -187,6 +188,27 @@ export default function TeamDetailsScreen() {
     }
   }
 
+  async function handleStartTask(task: TeamTask) {
+    try {
+      const updatedTask = await updateTeamTask(task.id, { status: "in-progress" });
+      setTasks((currentTasks) => currentTasks.map((entry) => (entry.id === task.id ? updatedTask : entry)));
+    } catch (err) {
+      Alert.alert("Could not update team task", err instanceof Error ? err.message : "Unknown error");
+    }
+  }
+
+  async function handleExtensionReview(task: TeamTask, decision: "approve" | "reject") {
+    try {
+      const updatedTask =
+        decision === "approve" ? await approveExtension(task.id) : await rejectExtension(task.id);
+
+      setTasks((currentTasks) => currentTasks.map((entry) => (entry.id === task.id ? updatedTask : entry)));
+      setPendingExtensions((currentTasks) => currentTasks.filter((entry) => entry.id !== task.id));
+    } catch (err) {
+      Alert.alert("Could not review extension", err instanceof Error ? err.message : "Unknown error");
+    }
+  }
+
   function toggleAssignee(memberId: string) {
     setSelectedAssigneeIds((current) =>
       current.includes(memberId)
@@ -196,11 +218,7 @@ export default function TeamDetailsScreen() {
   }
 
   return (
-    <ScrollView
-      style={[styles.scrollView, { backgroundColor: theme.background }]}
-      contentInset={{ top: safeAreaInsets.top, bottom: safeAreaInsets.bottom + Spacing.five }}
-      contentContainerStyle={styles.contentContainer}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadTeamWorkspace(true)} />}>
+    <ScreenShell refreshing={refreshing} onRefresh={() => loadTeamWorkspace(true)} includeTabInset={false}>
       <ThemedView style={styles.container}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <ThemedText type="smallBold">Back</ThemedText>
@@ -367,6 +385,13 @@ export default function TeamDetailsScreen() {
                     Share this from the Android app when a teammate needs to request access.
                   </ThemedText>
                   <ThemedText selectable>{inviteLink}</ThemedText>
+                  <Pressable
+                    onPress={() => Share.share({ message: inviteLink, url: inviteLink })}
+                    style={[styles.inlineButton, styles.primaryButton]}>
+                    <ThemedText type="smallBold" style={styles.primaryButtonText}>
+                      Share Invite Link
+                    </ThemedText>
+                  </Pressable>
                 </GlassView>
               </>
             ) : null}
@@ -392,12 +417,20 @@ export default function TeamDetailsScreen() {
                     <ThemedText type="small" themeColor="textSecondary">
                       {task.progressPercentage}% • {task.priority} priority
                       {task.reportLockActive ? " • report locked" : ""}
+                      {task.extensionStatus ? ` • extension ${task.extensionStatus}` : ""}
                     </ThemedText>
-                    {task.assigneeIds.includes(currentUserId) && task.status !== "completed" ? (
-                      <Pressable onPress={() => handleComplete(task)} style={styles.inlineButton}>
-                        <ThemedText type="smallBold">Mark complete</ThemedText>
-                      </Pressable>
-                    ) : null}
+                    <ThemedView style={styles.actionsRow}>
+                      {task.assigneeIds.includes(currentUserId) && task.status === "todo" ? (
+                        <Pressable onPress={() => handleStartTask(task)} style={styles.inlineButton}>
+                          <ThemedText type="smallBold">Start</ThemedText>
+                        </Pressable>
+                      ) : null}
+                      {task.assigneeIds.includes(currentUserId) && task.status !== "completed" ? (
+                        <Pressable onPress={() => handleComplete(task)} style={styles.inlineButton}>
+                          <ThemedText type="smallBold">Mark complete</ThemedText>
+                        </Pressable>
+                      ) : null}
+                    </ThemedView>
                   </GlassView>
                 ))
               ) : (
@@ -422,6 +455,22 @@ export default function TeamDetailsScreen() {
                       <ThemedText type="small" themeColor="textSecondary">
                         Requested due date: {task.extensionRequestedDueDate || "Unknown"}
                       </ThemedText>
+                      {canApproveExtensions ? (
+                        <ThemedView style={styles.actionsRow}>
+                          <Pressable
+                            onPress={() => handleExtensionReview(task, "approve")}
+                            style={[styles.inlineButton, styles.primaryButton]}>
+                            <ThemedText type="smallBold" style={styles.primaryButtonText}>
+                              Approve
+                            </ThemedText>
+                          </Pressable>
+                          <Pressable onPress={() => handleExtensionReview(task, "reject")} style={styles.inlineButton}>
+                            <ThemedText type="smallBold" themeColor="textSecondary">
+                              Reject
+                            </ThemedText>
+                          </Pressable>
+                        </ThemedView>
+                      ) : null}
                     </GlassView>
                   ))}
                 </ThemedView>
@@ -430,21 +479,12 @@ export default function TeamDetailsScreen() {
           </>
         ) : null}
       </ThemedView>
-    </ScrollView>
+    </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollView: { flex: 1 },
-  contentContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-  },
   container: {
-    maxWidth: MaxContentWidth,
-    flexGrow: 1,
-    paddingHorizontal: Spacing.four,
-    paddingBottom: Spacing.five,
     gap: Spacing.three,
   },
   backButton: {
@@ -499,6 +539,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.one,
   },
+  primaryButton: {
+    backgroundColor: Brand.primary,
+    borderRadius: 14,
+    paddingVertical: Spacing.two,
+    marginTop: Spacing.one,
+  },
+  primaryButtonText: {
+    color: "#f5f1ea",
+  },
   input: {
     borderWidth: 1,
     borderRadius: 14,
@@ -519,6 +568,11 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   stack: {
+    gap: Spacing.two,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: Spacing.two,
   },
   taskCard: {

@@ -1,17 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { GlassView } from "expo-glass-effect";
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ActivityIndicator, Alert, Pressable, StyleSheet } from "react-native";
 
+import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { BottomTabInset, MaxContentWidth, Spacing } from "@/constants/theme";
+import { Brand, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/services/auth-context";
 import { getProfile, type ProfileSummary } from "@/services/profile";
 
 export default function ProfileScreen() {
-  const safeAreaInsets = useSafeAreaInsets();
   const theme = useTheme();
   const { signOut } = useAuth();
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
@@ -46,17 +45,8 @@ export default function ProfileScreen() {
     return () => clearTimeout(timer);
   }, [loadProfile]);
 
-  const insets = {
-    ...safeAreaInsets,
-    bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
-  };
-
   return (
-    <ScrollView
-      style={[styles.scrollView, { backgroundColor: theme.background }]}
-      contentInset={insets}
-      contentContainerStyle={styles.contentContainer}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadProfile(true)} />}>
+    <ScreenShell refreshing={refreshing} onRefresh={() => loadProfile(true)}>
       <ThemedView style={styles.container}>
         <GlassView style={styles.heroCard}>
           <ThemedText type="smallBold" themeColor="textSecondary">
@@ -133,33 +123,28 @@ export default function ProfileScreen() {
                 await signOut();
                 Alert.alert("Signed out", "Your device session has been cleared.");
               }}
-              style={styles.signOutButton}>
-              <ThemedText type="smallBold">Sign Out</ThemedText>
+              style={[styles.signOutButton, { backgroundColor: Brand.primary }]}>
+              <ThemedText type="smallBold" style={styles.signOutText}>
+                Sign Out
+              </ThemedText>
             </Pressable>
           </>
         ) : null}
       </ThemedView>
-    </ScrollView>
+    </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollView: { flex: 1 },
-  contentContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-  },
   container: {
-    maxWidth: MaxContentWidth,
-    flexGrow: 1,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.five,
     gap: Spacing.three,
   },
   heroCard: {
     padding: Spacing.four,
     borderRadius: 28,
     gap: Spacing.two,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
   },
   heroTitle: {
     fontSize: 34,
@@ -200,6 +185,10 @@ const styles = StyleSheet.create({
   signOutButton: {
     alignSelf: "flex-start",
     paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
+    paddingVertical: Spacing.three,
+    borderRadius: 16,
+  },
+  signOutText: {
+    color: "#f5f1ea",
   },
 });

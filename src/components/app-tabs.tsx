@@ -1,7 +1,7 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { useColorScheme } from 'react-native';
 
-import { Colors } from '@/constants/theme';
+import { Brand, Colors } from '@/constants/theme';
 
 export default function AppTabs() {
   const scheme = useColorScheme();
@@ -9,9 +9,14 @@ export default function AppTabs() {
 
   return (
     <NativeTabs
-      backgroundColor={colors.background + 'e0'}
-      indicatorColor={colors.backgroundElement}
-      labelStyle={{ selected: { color: colors.text, fontWeight: '600' } }}>
+      backgroundColor={colors.background + 'f0'}
+      iconColor={colors.textSecondary}
+      tintColor={Brand.primary}
+      indicatorColor={Brand.primary}
+      labelStyle={{
+        selected: { color: colors.text, fontWeight: '700' },
+        style: { color: colors.textSecondary },
+      }}>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>Overview</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon

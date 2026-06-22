@@ -11,7 +11,7 @@ import { Pressable, useColorScheme, View, StyleSheet } from 'react-native';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
 
 export default function AppTabs() {
   return (
@@ -85,9 +85,12 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     gap: Spacing.two,
     maxWidth: MaxContentWidth,
+    borderWidth: 1,
+    borderColor: 'rgba(15,118,110,0.14)',
   },
   brandText: {
     marginRight: 'auto',
+    color: Brand.primary,
   },
   pressed: {
     opacity: 0.7,

@@ -5,16 +5,14 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  RefreshControl,
-  ScrollView,
   StyleSheet,
   TextInput,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { BottomTabInset, MaxContentWidth, Spacing } from "@/constants/theme";
+import { Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/services/auth-context";
 import { createTask, deleteTask, getTasks, updateTask, type PersonalTask } from "@/services/tasks";
@@ -30,7 +28,6 @@ function formatDueLabel(value: string | null) {
 }
 
 export default function MyTasksScreen() {
-  const safeAreaInsets = useSafeAreaInsets();
   const theme = useTheme();
   const { signOut } = useAuth();
   const [tasks, setTasks] = useState<PersonalTask[]>([]);
@@ -124,17 +121,8 @@ export default function MyTasksScreen() {
     }
   }
 
-  const insets = {
-    ...safeAreaInsets,
-    bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
-  };
-
   return (
-    <ScrollView
-      style={[styles.scrollView, { backgroundColor: theme.background }]}
-      contentInset={insets}
-      contentContainerStyle={styles.contentContainer}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadTasks(true)} />}>
+    <ScreenShell refreshing={refreshing} onRefresh={() => loadTasks(true)}>
       <ThemedView style={styles.container}>
         <ThemedView style={styles.header}>
           <ThemedText type="subtitle" style={styles.headerTitle}>
@@ -262,21 +250,12 @@ export default function MyTasksScreen() {
           )}
         </ThemedView>
       </ThemedView>
-    </ScrollView>
+    </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollView: { flex: 1 },
-  contentContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-  },
   container: {
-    maxWidth: MaxContentWidth,
-    flexGrow: 1,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.five,
     gap: Spacing.three,
   },
   header: {
@@ -290,6 +269,8 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
     borderRadius: 24,
     gap: Spacing.three,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
   },
   input: {
     borderWidth: 1,
