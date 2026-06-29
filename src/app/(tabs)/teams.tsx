@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
 import { GlassView } from "expo-glass-effect";
 import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput } from "react-native";
@@ -6,7 +6,7 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput } from "reac
 import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { Spacing } from "@/constants/theme";
+import { Brand, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/services/auth-context";
 import { getProfile } from "@/services/profile";
@@ -39,6 +39,16 @@ export default function TeamsScreen() {
   const [joining, setJoining] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const teamStats = useMemo(
+    () => ({
+      total: teams.length,
+      admin: teams.filter((team) => team.isAdmin).length,
+      pending: teams.reduce((sum, team) => sum + team.pendingJoinRequestCount, 0),
+      members: teams.reduce((sum, team) => sum + team.memberCount, 0),
+    }),
+    [teams]
+  );
 
   const loadTeams = useCallback(
     async (isRefresh = false) => {
@@ -129,13 +139,48 @@ export default function TeamsScreen() {
   return (
     <ScreenShell refreshing={refreshing} onRefresh={() => loadTeams(true)}>
       <ThemedView style={styles.container}>
-        <ThemedView style={styles.header}>
-          <ThemedText type="subtitle" style={styles.headerTitle}>
-            Teams
-          </ThemedText>
-          <ThemedText themeColor="textSecondary">
-            Shared workspaces, member roles, attendance, and team task visibility.
-          </ThemedText>
+        <GlassView style={styles.heroCard}>
+          <ThemedView style={styles.heroCopy}>
+            <ThemedText type="smallBold" themeColor="textSecondary">
+              TEAM WORKSPACES
+            </ThemedText>
+            <ThemedText type="subtitle" style={styles.headerTitle}>
+              Teams
+            </ThemedText>
+            <ThemedText themeColor="textSecondary">
+              Shared workspaces, member roles, attendance, and team task visibility.
+            </ThemedText>
+          </ThemedView>
+
+          <ThemedView style={styles.heroStats}>
+            <GlassView style={styles.heroStatCard}>
+              <ThemedText type="small" themeColor="textSecondary">
+                Workspaces
+              </ThemedText>
+              <ThemedText type="subtitle">{teamStats.total}</ThemedText>
+            </GlassView>
+            <GlassView style={styles.heroStatCard}>
+              <ThemedText type="small" themeColor="textSecondary">
+                Pending
+              </ThemedText>
+              <ThemedText type="subtitle">{teamStats.pending}</ThemedText>
+            </GlassView>
+          </ThemedView>
+        </GlassView>
+
+        <ThemedView style={styles.metricGrid}>
+          <GlassView style={styles.metricCard}>
+            <ThemedText type="small" themeColor="textSecondary">
+              Admin spaces
+            </ThemedText>
+            <ThemedText type="subtitle">{teamStats.admin}</ThemedText>
+          </GlassView>
+          <GlassView style={styles.metricCard}>
+            <ThemedText type="small" themeColor="textSecondary">
+              Members total
+            </ThemedText>
+            <ThemedText type="subtitle">{teamStats.members}</ThemedText>
+          </GlassView>
         </ThemedView>
 
         <GlassView style={styles.createCard}>
@@ -171,12 +216,8 @@ export default function TeamsScreen() {
               />
             ))}
           </ThemedView>
-          <Pressable onPress={handleCreateTeam} disabled={creating} style={styles.createButton}>
-            {creating ? (
-              <ActivityIndicator color={theme.text} />
-            ) : (
-              <ThemedText type="smallBold">Create Team</ThemedText>
-            )}
+          <Pressable onPress={handleCreateTeam} disabled={creating} style={[styles.primaryButton, { backgroundColor: theme.primary }]}>
+            {creating ? <ActivityIndicator color="#f5f1ea" /> : <ThemedText type="smallBold" style={styles.primaryButtonText}>Create Team</ThemedText>}
           </Pressable>
         </GlassView>
 
@@ -195,12 +236,8 @@ export default function TeamsScreen() {
             autoCapitalize="none"
             style={[styles.input, { color: theme.text, borderColor: theme.backgroundSelected }]}
           />
-          <Pressable onPress={handleJoinTeam} disabled={joining} style={styles.createButton}>
-            {joining ? (
-              <ActivityIndicator color={theme.text} />
-            ) : (
-              <ThemedText type="smallBold">Request to Join</ThemedText>
-            )}
+          <Pressable onPress={handleJoinTeam} disabled={joining} style={[styles.primaryButton, { backgroundColor: Brand.secondary }]}>
+            {joining ? <ActivityIndicator color="#f5f1ea" /> : <ThemedText type="smallBold" style={styles.primaryButtonText}>Request to Join</ThemedText>}
           </Pressable>
         </GlassView>
 
@@ -232,23 +269,39 @@ export default function TeamsScreen() {
                 }
                 style={styles.teamPressable}>
                 <GlassView style={styles.teamCard}>
-                  <ThemedView style={styles.teamTopRow}>
+                  <ThemedView style={styles.teamHeader}>
                     <ThemedView style={[styles.colorBadge, { backgroundColor: team.color }]} />
                     <ThemedView style={styles.teamCopy}>
                       <ThemedText>{team.name}</ThemedText>
                       <ThemedText type="small" themeColor="textSecondary">
-                        {team.memberCount} members • {team.myRole}
+                        {team.memberCount} members - {team.myRole}
+                      </ThemedText>
+                    </ThemedView>
+                    <ThemedView
+                      style={[
+                        styles.rolePill,
+                        {
+                          backgroundColor: team.pendingJoinRequestCount ? "rgba(247, 168, 60, 0.16)" : theme.backgroundSelected,
+                        },
+                      ]}>
+                      <ThemedText type="smallBold">
+                        {team.pendingJoinRequestCount ? `${team.pendingJoinRequestCount} pending` : team.isAdmin ? "Admin" : "Member"}
                       </ThemedText>
                     </ThemedView>
                   </ThemedView>
+
                   <ThemedText type="small" themeColor="textSecondary">
                     {team.description || "No description yet."}
                   </ThemedText>
-                  <ThemedText type="smallBold">
-                    {team.pendingJoinRequestCount > 0
-                      ? `${team.pendingJoinRequestCount} pending join requests`
-                      : "Open workspace"}
-                  </ThemedText>
+
+                  <ThemedView style={styles.teamFooter}>
+                    <ThemedText type="smallBold" style={{ color: team.color }}>
+                      Open workspace
+                    </ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      Attendance, tasks, invite flow
+                    </ThemedText>
+                  </ThemedView>
                 </GlassView>
               </Pressable>
             ))
@@ -256,7 +309,7 @@ export default function TeamsScreen() {
             <GlassView style={styles.emptyCard}>
               <ThemedText>No team workspaces yet.</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
-                Create one above to start shared task execution from the Android app.
+                Create one above to start shared task execution from the app.
               </ThemedText>
             </GlassView>
           )}
@@ -270,8 +323,40 @@ const styles = StyleSheet.create({
   container: {
     gap: Spacing.three,
   },
-  header: { gap: Spacing.one },
-  headerTitle: { fontSize: 34, lineHeight: 40 },
+  heroCard: {
+    padding: Spacing.four,
+    borderRadius: 28,
+    gap: Spacing.three,
+  },
+  heroCopy: {
+    gap: Spacing.one,
+    backgroundColor: "transparent",
+  },
+  headerTitle: {
+    fontSize: 34,
+    lineHeight: 40,
+  },
+  heroStats: {
+    flexDirection: "row",
+    gap: Spacing.two,
+    backgroundColor: "transparent",
+  },
+  heroStatCard: {
+    flex: 1,
+    padding: Spacing.three,
+    borderRadius: 20,
+    gap: 4,
+  },
+  metricGrid: {
+    flexDirection: "row",
+    gap: Spacing.two,
+  },
+  metricCard: {
+    flex: 1,
+    padding: Spacing.three,
+    borderRadius: 20,
+    gap: 4,
+  },
   createCard: {
     padding: Spacing.four,
     borderRadius: 24,
@@ -296,12 +381,18 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 2,
   },
-  createButton: {
+  primaryButton: {
     alignSelf: "flex-start",
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.two,
+    borderRadius: 999,
   },
-  loadingWrap: { paddingVertical: Spacing.five },
+  primaryButtonText: {
+    color: "#f5f1ea",
+  },
+  loadingWrap: {
+    paddingVertical: Spacing.five,
+  },
   errorCard: {
     padding: Spacing.three,
     borderRadius: 20,
@@ -318,7 +409,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     gap: Spacing.two,
   },
-  teamTopRow: {
+  teamHeader: {
     flexDirection: "row",
     gap: Spacing.two,
     alignItems: "center",
@@ -331,6 +422,17 @@ const styles = StyleSheet.create({
   teamCopy: {
     flex: 1,
     gap: 4,
+  },
+  rolePill: {
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+    borderRadius: 999,
+  },
+  teamFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: Spacing.two,
   },
   emptyCard: {
     padding: Spacing.four,

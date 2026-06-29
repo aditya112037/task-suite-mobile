@@ -1,18 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GlassView } from "expo-glass-effect";
 import { SymbolView } from "expo-symbols";
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  StyleSheet,
-  TextInput,
-} from "react-native";
+import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput } from "react-native";
 
 import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { Spacing } from "@/constants/theme";
+import { Brand, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/services/auth-context";
 import { createTask, deleteTask, getTasks, updateTask, type PersonalTask } from "@/services/tasks";
@@ -27,6 +21,18 @@ function formatDueLabel(value: string | null) {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+function getTaskUrgency(task: PersonalTask) {
+  if (!task.dueDate || task.status === "completed") return "steady";
+
+  const dueDate = new Date(task.dueDate);
+  if (Number.isNaN(dueDate.getTime())) return "steady";
+
+  const diffMs = dueDate.getTime() - Date.now();
+  if (diffMs < 0) return "overdue";
+  if (diffMs <= 1000 * 60 * 60 * 24 * 2) return "soon";
+  return "steady";
+}
+
 export default function MyTasksScreen() {
   const theme = useTheme();
   const { signOut } = useAuth();
@@ -39,8 +45,29 @@ export default function MyTasksScreen() {
   const [filter, setFilter] = useState<FilterKey>("all");
 
   const visibleTasks = useMemo(() => {
-    return filter === "all" ? tasks : tasks.filter((task) => task.status === filter);
+    const filtered = filter === "all" ? tasks : tasks.filter((task) => task.status === filter);
+
+    return [...filtered].sort((left, right) => {
+      const urgencyOrder = { overdue: 0, soon: 1, steady: 2 };
+      const urgencyGap = urgencyOrder[getTaskUrgency(left)] - urgencyOrder[getTaskUrgency(right)];
+      if (urgencyGap !== 0) return urgencyGap;
+
+      const rightTime = right.updatedAt ? new Date(right.updatedAt).getTime() : 0;
+      const leftTime = left.updatedAt ? new Date(left.updatedAt).getTime() : 0;
+      return rightTime - leftTime;
+    });
   }, [filter, tasks]);
+
+  const taskStats = useMemo(
+    () => ({
+      total: tasks.length,
+      todo: tasks.filter((task) => task.status === "todo").length,
+      inProgress: tasks.filter((task) => task.status === "in-progress").length,
+      completed: tasks.filter((task) => task.status === "completed").length,
+      overdue: tasks.filter((task) => getTaskUrgency(task) === "overdue").length,
+    }),
+    [tasks]
+  );
 
   const loadTasks = useCallback(
     async (isRefresh = false) => {
@@ -133,6 +160,31 @@ export default function MyTasksScreen() {
           </ThemedText>
         </ThemedView>
 
+        <GlassView style={styles.heroCard}>
+          <ThemedView style={styles.heroCopy}>
+            <ThemedText type="smallBold" themeColor="textSecondary">
+              TODAY&apos;S PLAN
+            </ThemedText>
+            <ThemedText>
+              {taskStats.inProgress} moving now, {taskStats.todo} ready to start, and {taskStats.overdue} overdue.
+            </ThemedText>
+          </ThemedView>
+          <ThemedView style={styles.heroMetrics}>
+            <GlassView style={styles.heroMetricCard}>
+              <ThemedText type="small" themeColor="textSecondary">
+                Open
+              </ThemedText>
+              <ThemedText type="subtitle">{taskStats.todo + taskStats.inProgress}</ThemedText>
+            </GlassView>
+            <GlassView style={styles.heroMetricCard}>
+              <ThemedText type="small" themeColor="textSecondary">
+                Done
+              </ThemedText>
+              <ThemedText type="subtitle">{taskStats.completed}</ThemedText>
+            </GlassView>
+          </ThemedView>
+        </GlassView>
+
         <GlassView style={styles.composerCard}>
           <ThemedText type="smallBold" themeColor="textSecondary">
             Quick Capture
@@ -153,12 +205,8 @@ export default function MyTasksScreen() {
           <Pressable
             onPress={handleCreateTask}
             disabled={saving}
-            style={({ pressed }) => [styles.createButton, { opacity: pressed || saving ? 0.8 : 1 }]}>
-            {saving ? (
-              <ActivityIndicator color={theme.text} />
-            ) : (
-              <ThemedText type="smallBold">Create Task</ThemedText>
-            )}
+            style={({ pressed }) => [styles.createButton, { backgroundColor: theme.primary, opacity: pressed || saving ? 0.82 : 1 }]}>
+            {saving ? <ActivityIndicator color="#f5f1ea" /> : <ThemedText type="smallBold" style={styles.primaryText}>Create Task</ThemedText>}
           </Pressable>
         </GlassView>
 
@@ -198,46 +246,64 @@ export default function MyTasksScreen() {
 
         <ThemedView style={styles.taskList}>
           {visibleTasks.length ? (
-            visibleTasks.map((task) => (
-              <GlassView key={task.id} style={styles.taskCard}>
-                <ThemedView style={styles.taskTopRow}>
-                  <ThemedView style={styles.taskMeta}>
-                    <ThemedText>{task.title}</ThemedText>
+            visibleTasks.map((task) => {
+              const urgency = getTaskUrgency(task);
+              const urgencyColor = urgency === "overdue" ? "#d94b4b" : urgency === "soon" ? Brand.warning : theme.textSecondary;
+
+              return (
+                <GlassView key={task.id} style={styles.taskCard}>
+                  <ThemedView style={styles.taskTopRow}>
+                    <ThemedView style={styles.taskMeta}>
+                      <ThemedText>{task.title}</ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {task.priority} priority - {task.status.replace("-", " ")}
+                      </ThemedText>
+                    </ThemedView>
+                    <SymbolView
+                      tintColor={task.status === "completed" ? "#34c759" : theme.textSecondary}
+                      name={{
+                        ios: task.status === "completed" ? "checkmark.circle.fill" : "circle.dashed",
+                        android: task.status === "completed" ? "check_circle" : "pending",
+                      }}
+                      size={22}
+                    />
+                  </ThemedView>
+
+                  <ThemedView style={styles.progressTrack}>
+                    <ThemedView style={[styles.progressFill, { width: `${Math.max(8, task.progressPercentage)}%`, backgroundColor: theme.primary }]} />
+                  </ThemedView>
+
+                  <ThemedView style={styles.taskMetaRow}>
                     <ThemedText type="small" themeColor="textSecondary">
-                      {task.priority} priority • {task.status.replace("-", " ")}
+                      {formatDueLabel(task.dueDate)} - {task.workspace} - {task.completedSubtasks}/{task.totalSubtasks} checklist items
+                    </ThemedText>
+                    <ThemedText type="smallBold" style={{ color: urgencyColor }}>
+                      {urgency === "overdue" ? "Overdue" : urgency === "soon" ? "Due soon" : `${task.progressPercentage}%`}
                     </ThemedText>
                   </ThemedView>
-                  <SymbolView
-                    tintColor={task.status === "completed" ? "#34c759" : theme.textSecondary}
-                    name={{
-                      ios: task.status === "completed" ? "checkmark.circle.fill" : "circle.dashed",
-                      android: task.status === "completed" ? "check_circle" : "pending",
-                    }}
-                    size={22}
-                  />
-                </ThemedView>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {formatDueLabel(task.dueDate)} • {task.workspace} • {task.completedSubtasks}/{task.totalSubtasks} checklist items
-                </ThemedText>
-                <ThemedView style={styles.actionsRow}>
-                  {task.status === "todo" ? (
-                    <Pressable onPress={() => handleProgress(task, "start")} style={styles.actionButton}>
-                      <ThemedText type="smallBold">Start</ThemedText>
+
+                  <ThemedView style={styles.actionsRow}>
+                    {task.status === "todo" ? (
+                      <Pressable onPress={() => handleProgress(task, "start")} style={styles.actionButton}>
+                        <ThemedText type="smallBold">Start</ThemedText>
+                      </Pressable>
+                    ) : null}
+                    {task.status !== "completed" ? (
+                      <Pressable onPress={() => handleProgress(task, "complete")} style={[styles.actionButton, styles.primaryActionButton]}>
+                        <ThemedText type="smallBold" style={styles.primaryText}>
+                          Complete
+                        </ThemedText>
+                      </Pressable>
+                    ) : null}
+                    <Pressable onPress={() => handleDelete(task)} style={styles.actionButton}>
+                      <ThemedText type="smallBold" themeColor="textSecondary">
+                        Delete
+                      </ThemedText>
                     </Pressable>
-                  ) : null}
-                  {task.status !== "completed" ? (
-                    <Pressable onPress={() => handleProgress(task, "complete")} style={styles.actionButton}>
-                      <ThemedText type="smallBold">Complete</ThemedText>
-                    </Pressable>
-                  ) : null}
-                  <Pressable onPress={() => handleDelete(task)} style={styles.actionButton}>
-                    <ThemedText type="smallBold" themeColor="textSecondary">
-                      Delete
-                    </ThemedText>
-                  </Pressable>
-                </ThemedView>
-              </GlassView>
-            ))
+                  </ThemedView>
+                </GlassView>
+              );
+            })
           ) : (
             <GlassView style={styles.emptyCard}>
               <ThemedText>{tasks.length ? "Nothing in this filter." : "No personal tasks yet."}</ThemedText>
@@ -265,6 +331,26 @@ const styles = StyleSheet.create({
     fontSize: 34,
     lineHeight: 40,
   },
+  heroCard: {
+    padding: Spacing.three,
+    borderRadius: 24,
+    gap: Spacing.three,
+  },
+  heroCopy: {
+    gap: 6,
+    backgroundColor: "transparent",
+  },
+  heroMetrics: {
+    flexDirection: "row",
+    gap: Spacing.two,
+    backgroundColor: "transparent",
+  },
+  heroMetricCard: {
+    flex: 1,
+    padding: Spacing.three,
+    borderRadius: 20,
+    gap: 4,
+  },
   composerCard: {
     padding: Spacing.four,
     borderRadius: 24,
@@ -283,6 +369,10 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.two,
+    borderRadius: 999,
+  },
+  primaryText: {
+    color: "#f5f1ea",
   },
   filterRow: {
     flexDirection: "row",
@@ -319,6 +409,22 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 4,
   },
+  progressTrack: {
+    height: 8,
+    borderRadius: 999,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 999,
+  },
+  taskMetaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: Spacing.two,
+    alignItems: "center",
+  },
   actionsRow: {
     flexDirection: "row",
     gap: Spacing.two,
@@ -326,7 +432,11 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
+    paddingVertical: Spacing.two,
+    borderRadius: 999,
+  },
+  primaryActionButton: {
+    backgroundColor: Brand.primary,
   },
   emptyCard: {
     padding: Spacing.four,

@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
 import { SymbolView } from "expo-symbols";
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  StyleSheet,
-} from "react-native";
+import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet } from "react-native";
 
 import { AppCard } from "@/components/app-card";
 import { ScreenShell } from "@/components/screen-shell";
@@ -24,6 +19,15 @@ function formatShortDate(value: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "No due date";
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function isDueSoon(value: string | null) {
+  if (!value) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+
+  const diffMs = date.getTime() - Date.now();
+  return diffMs >= 0 && diffMs <= 1000 * 60 * 60 * 24 * 3;
 }
 
 export default function OverviewScreen() {
@@ -45,6 +49,16 @@ export default function OverviewScreen() {
     () => personalTasks.filter((task) => task.status !== "completed").slice(0, 3),
     [personalTasks]
   );
+
+  const dueSoonCount = useMemo(
+    () => personalTasks.filter((task) => task.status !== "completed" && isDueSoon(task.dueDate)).length,
+    [personalTasks]
+  );
+
+  const attentionQueue = profile?.progress.needsAttentionTasks.slice(0, 3) ?? [];
+  const completedAssignedRate = profile?.progress.assignedTasks
+    ? Math.round((profile.progress.completedAssignedTasks / profile.progress.assignedTasks) * 100)
+    : 0;
 
   const loadOverview = useCallback(
     async (isRefresh = false) => {
@@ -90,17 +104,32 @@ export default function OverviewScreen() {
     <ScreenShell refreshing={refreshing} onRefresh={() => loadOverview(true)}>
       <ThemedView style={styles.container}>
         <AppCard variant="hero" style={styles.heroCard}>
-          <ThemedText type="smallBold" themeColor="textSecondary">
-            TASK SUITE
-          </ThemedText>
-          <ThemedText type="subtitle" style={styles.heroTitle}>
-            {profile ? `Keep ${profile.progress.activeTasks} active threads moving.` : "Your mobile command deck."}
-          </ThemedText>
-          <ThemedText themeColor="textSecondary">
-            {profile
-              ? `${profile.name}, here is the fastest read on your personal work and team assignments.`
-              : "Loading your personal tasks, assigned work, and team nudges."}
-          </ThemedText>
+          <ThemedView style={styles.heroCopy}>
+            <ThemedText type="smallBold" themeColor="textSecondary">
+              TASK SUITE
+            </ThemedText>
+            <ThemedText type="subtitle" style={styles.heroTitle}>
+              {profile ? `Keep ${profile.progress.activeTasks} active threads moving.` : "Your mobile command deck."}
+            </ThemedText>
+            <ThemedText themeColor="textSecondary">
+              {profile
+                ? `${profile.name}, here is the fastest read on your personal work and team assignments.`
+                : "Loading your personal tasks, assigned work, and team nudges."}
+            </ThemedText>
+          </ThemedView>
+
+          <ThemedView style={styles.heroActions}>
+            <Pressable onPress={() => router.push("/remote-work")} style={[styles.heroButton, { backgroundColor: theme.primary }]}>
+              <ThemedText type="smallBold" style={styles.heroButtonText}>
+                Open My Tasks
+              </ThemedText>
+            </Pressable>
+            <Pressable onPress={() => router.push("/teams")} style={styles.secondaryHeroButton}>
+              <ThemedText type="smallBold" themeColor="textSecondary">
+                Jump to Teams
+              </ThemedText>
+            </Pressable>
+          </ThemedView>
         </AppCard>
 
         {loading ? (
@@ -145,16 +174,44 @@ export default function OverviewScreen() {
               </ThemedText>
               <ThemedText type="subtitle">{profile.identity.teams.length}</ThemedText>
             </AppCard>
+            <AppCard style={styles.metricCard}>
+              <ThemedText type="small" themeColor="textSecondary">
+                Due soon
+              </ThemedText>
+              <ThemedText type="subtitle">{dueSoonCount}</ThemedText>
+            </AppCard>
+            <AppCard style={styles.metricCard}>
+              <ThemedText type="small" themeColor="textSecondary">
+                Assigned done
+              </ThemedText>
+              <ThemedText type="subtitle">{completedAssignedRate}%</ThemedText>
+            </AppCard>
           </ThemedView>
+        ) : null}
+
+        {profile ? (
+          <AppCard variant="soft" style={styles.snapshotCard}>
+            <ThemedView style={styles.snapshotRow}>
+              <ThemedView style={styles.snapshotItem}>
+                <ThemedText type="smallBold">Today&apos;s pace</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {profile.progress.activeTasks} active, {profile.progress.completedSubtasks}/{profile.progress.totalSubtasks} checklist items closed.
+                </ThemedText>
+              </ThemedView>
+              <ThemedView style={styles.snapshotDivider} />
+              <ThemedView style={styles.snapshotItem}>
+                <ThemedText type="smallBold">Workspace status</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {assignedTasks.length} assigned from teams and {focusTasks.length} personal tasks still open.
+                </ThemedText>
+              </ThemedView>
+            </ThemedView>
+          </AppCard>
         ) : null}
 
         {profile?.progress.reminder ? (
           <AppCard style={styles.reminderCard}>
-            <SymbolView
-              tintColor={Brand.warning}
-              name={{ ios: "exclamationmark.triangle.fill", android: "warning" }}
-              size={18}
-            />
+            <SymbolView tintColor={Brand.warning} name={{ ios: "exclamationmark.triangle.fill", android: "warning" }} size={18} />
             <ThemedView style={styles.reminderCopy}>
               <ThemedText type="smallBold">Needs attention</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
@@ -162,6 +219,39 @@ export default function OverviewScreen() {
               </ThemedText>
             </ThemedView>
           </AppCard>
+        ) : null}
+
+        {attentionQueue.length ? (
+          <>
+            <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionLabel}>
+              Attention Queue
+            </ThemedText>
+            <ThemedView style={styles.sectionStack}>
+              {attentionQueue.map((item) => (
+                <Pressable
+                  key={`${item.teamId || "personal"}-${item.taskId || item.title}`}
+                  onPress={() => {
+                    if (item.teamId) {
+                      router.push({ pathname: "/team/[teamId]", params: { teamId: item.teamId } });
+                    } else {
+                      router.push("/remote-work");
+                    }
+                  }}>
+                  <AppCard variant="soft" style={styles.attentionCard}>
+                    <ThemedView style={styles.taskRow}>
+                      <ThemedView style={styles.taskCopy}>
+                        <ThemedText>{item.title}</ThemedText>
+                        <ThemedText type="small" themeColor="textSecondary">
+                          {item.stalledSubtasks} stalled items - quiet for {item.maxDaysStalled} day{item.maxDaysStalled === 1 ? "" : "s"}
+                        </ThemedText>
+                      </ThemedView>
+                      <ThemedText type="smallBold">{item.teamId ? "Team" : "Mine"}</ThemedText>
+                    </ThemedView>
+                  </AppCard>
+                </Pressable>
+              ))}
+            </ThemedView>
+          </>
         ) : null}
 
         <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionLabel}>
@@ -182,7 +272,7 @@ export default function OverviewScreen() {
                     <ThemedView style={styles.taskCopy}>
                       <ThemedText>{task.title}</ThemedText>
                       <ThemedText type="small" themeColor="textSecondary">
-                        {task.teamName} • {task.status.replace("-", " ")}
+                        {task.teamName} - {task.status.replace("-", " ")}
                       </ThemedText>
                     </ThemedView>
                     <ThemedText type="smallBold">{task.progressPercentage}%</ThemedText>
@@ -211,7 +301,7 @@ export default function OverviewScreen() {
                   <ThemedView style={styles.taskCopy}>
                     <ThemedText>{task.title}</ThemedText>
                     <ThemedText type="small" themeColor="textSecondary">
-                      {task.priority} priority • due {formatShortDate(task.dueDate)}
+                      {task.priority} priority - due {formatShortDate(task.dueDate)}
                     </ThemedText>
                   </ThemedView>
                   <ThemedText type="smallBold">{task.progressPercentage}%</ThemedText>
@@ -257,13 +347,35 @@ const styles = StyleSheet.create({
   heroCard: {
     padding: Spacing.four,
     borderRadius: 28,
-    gap: Spacing.two,
+    gap: Spacing.three,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
+  },
+  heroCopy: {
+    gap: Spacing.two,
   },
   heroTitle: {
     fontSize: 34,
     lineHeight: 40,
+  },
+  heroActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.two,
+    backgroundColor: "transparent",
+  },
+  heroButton: {
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.two,
+    borderRadius: 999,
+  },
+  heroButtonText: {
+    color: "#f5f1ea",
+  },
+  secondaryHeroButton: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: 999,
   },
   loadingWrap: {
     paddingVertical: Spacing.five,
@@ -274,11 +386,29 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   metricCard: {
-    minWidth: "47%",
+    minWidth: Platform.OS === "web" ? 180 : "47%",
     flexGrow: 1,
     padding: Spacing.three,
     borderRadius: 22,
     gap: Spacing.one,
+  },
+  snapshotCard: {
+    borderRadius: 24,
+  },
+  snapshotRow: {
+    flexDirection: Platform.OS === "web" ? "row" : "column",
+    gap: Spacing.three,
+    backgroundColor: "transparent",
+  },
+  snapshotItem: {
+    flex: 1,
+    gap: 4,
+    backgroundColor: "transparent",
+  },
+  snapshotDivider: {
+    width: Platform.OS === "web" ? 1 : "100%",
+    height: Platform.OS === "web" ? "auto" : 1,
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
   reminderCard: {
     flexDirection: "row",
@@ -310,6 +440,9 @@ const styles = StyleSheet.create({
   },
   sectionStack: {
     gap: Spacing.two,
+  },
+  attentionCard: {
+    borderRadius: 20,
   },
   taskCard: {
     padding: Spacing.three,

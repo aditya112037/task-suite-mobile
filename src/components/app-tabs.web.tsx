@@ -11,7 +11,7 @@ import { Pressable, View, StyleSheet } from 'react-native';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export default function AppTabs() {
@@ -72,31 +72,39 @@ const styles = StyleSheet.create({
   tabListContainer: {
     position: 'absolute',
     width: '100%',
-    padding: Spacing.three,
+    bottom: 0,
+    paddingHorizontal: Spacing.three,
+    paddingBottom: Spacing.three,
+    paddingTop: Spacing.two,
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
+    pointerEvents: 'box-none',
   },
   innerContainer: {
     paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.five,
-    borderRadius: Spacing.five,
+    paddingHorizontal: Spacing.three,
+    borderRadius: 999,
     flexDirection: 'row',
     alignItems: 'center',
-    flexGrow: 1,
     gap: Spacing.two,
-    maxWidth: MaxContentWidth,
+    width: '100%',
+    maxWidth: 720,
     borderWidth: 1,
+    pointerEvents: 'auto',
   },
   brandText: {
     marginRight: 'auto',
+    paddingLeft: Spacing.one,
   },
   pressed: {
     opacity: 0.7,
   },
   tabButtonView: {
-    paddingVertical: Spacing.one,
+    paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.three,
+    borderRadius: 999,
+    minWidth: 88,
+    alignItems: 'center',
   },
 });

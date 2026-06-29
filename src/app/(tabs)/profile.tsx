@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { GlassView } from "expo-glass-effect";
-import { ActivityIndicator, Alert, Pressable, StyleSheet } from "react-native";
+import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet } from "react-native";
 
 import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
@@ -19,6 +19,11 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const completionRate = useMemo(() => {
+    if (!profile?.progress.personalTotalTasks) return 0;
+    return Math.round((profile.progress.personalCompletedTasks / profile.progress.personalTotalTasks) * 100);
+  }, [profile]);
 
   const loadProfile = useCallback(async (isRefresh = false) => {
     try {
@@ -79,6 +84,21 @@ export default function ProfileScreen() {
 
         {profile ? (
           <>
+            <GlassView style={styles.progressCard}>
+              <ThemedText type="smallBold" themeColor="textSecondary">
+                Execution snapshot
+              </ThemedText>
+              <ThemedText>
+                You have finished {profile.progress.personalCompletedTasks} of {profile.progress.personalTotalTasks} personal tasks and completed {profile.progress.completedSubtasks} checkpoints overall.
+              </ThemedText>
+              <ThemedView style={styles.progressTrack}>
+                <ThemedView style={[styles.progressFill, { width: `${Math.max(10, completionRate)}%`, backgroundColor: theme.primary }]} />
+              </ThemedView>
+              <ThemedText type="small" themeColor="textSecondary">
+                Personal completion rate: {completionRate}%
+              </ThemedText>
+            </GlassView>
+
             <ThemedView style={styles.metricGrid}>
               <GlassView style={styles.metricCard}>
                 <ThemedText type="small" themeColor="textSecondary">
@@ -110,12 +130,17 @@ export default function ProfileScreen() {
               Team Footprint
             </ThemedText>
             <ThemedView style={styles.sectionStack}>
-              {profile.identity.teams.map((team) => (
-                <GlassView key={team.id} style={styles.teamCard}>
-                  <ThemedText>{team.name}</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {team.role}
-                  </ThemedText>
+              {profile.identity.teams.map((teamEntry) => (
+                <GlassView key={teamEntry.id} style={styles.teamCard}>
+                  <ThemedView style={styles.teamRow}>
+                    <ThemedView style={[styles.teamColor, { backgroundColor: teamEntry.color || theme.primary }]} />
+                    <ThemedView style={styles.teamCopy}>
+                      <ThemedText>{teamEntry.name}</ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {teamEntry.role}
+                      </ThemedText>
+                    </ThemedView>
+                  </ThemedView>
                 </GlassView>
               ))}
             </ThemedView>
@@ -146,6 +171,17 @@ export default function ProfileScreen() {
                 );
               })}
             </ThemedView>
+
+            {Platform.OS === "web" ? (
+              <GlassView style={styles.webCard}>
+                <ThemedText type="smallBold" themeColor="textSecondary">
+                  Web install
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  If your browser supports app install, Task Suite will show an install banner so this workspace can behave more like a focused mobile PWA.
+                </ThemedText>
+              </GlassView>
+            ) : null}
 
             <Pressable
               onPress={async () => {
@@ -187,6 +223,21 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     gap: Spacing.one,
   },
+  progressCard: {
+    padding: Spacing.three,
+    borderRadius: 22,
+    gap: Spacing.two,
+  },
+  progressTrack: {
+    height: 8,
+    borderRadius: 999,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 999,
+  },
   metricGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -218,13 +269,31 @@ const styles = StyleSheet.create({
   teamCard: {
     padding: Spacing.three,
     borderRadius: 20,
+  },
+  teamRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two,
+  },
+  teamColor: {
+    width: 14,
+    height: 42,
+    borderRadius: 999,
+  },
+  teamCopy: {
+    flex: 1,
     gap: 4,
+  },
+  webCard: {
+    padding: Spacing.three,
+    borderRadius: 20,
+    gap: Spacing.one,
   },
   signOutButton: {
     alignSelf: "flex-start",
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.three,
-    borderRadius: 16,
+    borderRadius: 999,
   },
   signOutText: {
     color: "#f5f1ea",
