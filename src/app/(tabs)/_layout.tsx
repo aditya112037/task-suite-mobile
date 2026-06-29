@@ -19,7 +19,7 @@ export default function TabsLayout() {
   }
 
   if (!hasToken) {
-    return <Redirect href="/(auth)/login" />;
+    return <Redirect href="/" />;
   }
 
   return (
