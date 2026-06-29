@@ -69,6 +69,17 @@ export type TeamSummary = {
   isAdmin: boolean;
 };
 
+export type JoinRequestNotice = {
+  teamId: string;
+  teamName: string;
+  teamColor?: string | null;
+  teamIcon?: string | null;
+  requestedAt?: string | null;
+  createdAt?: string | null;
+  message?: string | null;
+  notificationId?: string | null;
+};
+
 export type TeamDetail = TeamSummary & {
   members: TeamMember[];
   roles: TeamRole[];
@@ -366,6 +377,17 @@ export const normalizeAttendance = (raw: RawRecord): TeamAttendance => ({
     punchOutAt: record.punchOutAt ? readString(record.punchOutAt) : null,
     onLeave: readBoolean(record.onLeave),
   })),
+});
+
+export const normalizeJoinRequestNotice = (raw: RawRecord): JoinRequestNotice => ({
+  teamId: toId(raw.teamId) || toId(raw.team) || readString(raw.teamId),
+  teamName: readString(raw.teamName || raw.team?.name, "Team"),
+  teamColor: raw.teamColor ? readString(raw.teamColor) : raw.team?.color ? readString(raw.team.color) : null,
+  teamIcon: raw.teamIcon ? readString(raw.teamIcon) : raw.team?.icon ? readString(raw.team.icon) : null,
+  requestedAt: raw.requestedAt ? readString(raw.requestedAt) : null,
+  createdAt: raw.createdAt ? readString(raw.createdAt) : null,
+  message: raw.message ? readString(raw.message) : null,
+  notificationId: raw.notificationId ? toId(raw.notificationId) || readString(raw.notificationId) : raw._id ? toId(raw) : null,
 });
 
 export const normalizeProfile = (raw: RawRecord): ProfileSummary => ({

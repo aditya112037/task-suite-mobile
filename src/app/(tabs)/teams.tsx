@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { GlassView } from "expo-glass-effect";
 import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput } from "react-native";
 
@@ -10,7 +10,16 @@ import { Brand, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/services/auth-context";
 import { getProfile } from "@/services/profile";
-import { createTeam, getTeams, joinTeam, type TeamSummary } from "@/services/teams";
+import {
+  clearRejectedJoinRequest,
+  createTeam,
+  getMyJoinRequests,
+  getTeams,
+  joinTeam,
+  retractJoinRequest,
+  type JoinRequestNotice,
+  type TeamSummary,
+} from "@/services/teams";
 
 const COLOR_OPTIONS = ["#3c87f7", "#f97316", "#10b981", "#e11d48"];
 
@@ -28,8 +37,11 @@ function extractInviteCode(value: string) {
 
 export default function TeamsScreen() {
   const theme = useTheme();
+  const { action } = useLocalSearchParams<{ action?: string }>();
   const { signOut } = useAuth();
   const [teams, setTeams] = useState<TeamSummary[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<JoinRequestNotice[]>([]);
+  const [rejectedRequests, setRejectedRequests] = useState<JoinRequestNotice[]>([]);
   const [teamName, setTeamName] = useState("");
   const [teamDescription, setTeamDescription] = useState("");
   const [inviteCode, setInviteCode] = useState("");
@@ -37,6 +49,7 @@ export default function TeamsScreen() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [requestBusyId, setRequestBusyId] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,8 +73,10 @@ export default function TeamsScreen() {
         }
 
         const profile = await getProfile();
-        const nextTeams = await getTeams(profile.id);
+        const [nextTeams, joinRequests] = await Promise.all([getTeams(profile.id), getMyJoinRequests().catch(() => ({ pending: [], rejected: [] }))]);
         setTeams(nextTeams);
+        setPendingRequests(joinRequests.pending);
+        setRejectedRequests(joinRequests.rejected);
         setError(null);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to load teams";
@@ -87,6 +102,14 @@ export default function TeamsScreen() {
     return () => clearTimeout(timer);
   }, [loadTeams]);
 
+  useEffect(() => {
+    if (action === "join") {
+      setTimeout(() => {
+        setError("Paste an invite link below and request access.");
+      }, 0);
+    }
+  }, [action]);
+
   async function handleCreateTeam() {
     const name = teamName.trim();
 
@@ -107,6 +130,7 @@ export default function TeamsScreen() {
       setTeamName("");
       setTeamDescription("");
       await loadTeams();
+      Alert.alert("Workspace created", "Your team is ready.");
     } catch (err) {
       Alert.alert("Could not create team", err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -136,6 +160,30 @@ export default function TeamsScreen() {
     }
   }
 
+  async function handleRetractRequest(teamId: string) {
+    try {
+      setRequestBusyId(teamId);
+      await retractJoinRequest(teamId);
+      await loadTeams(true);
+    } catch (err) {
+      Alert.alert("Could not retract request", err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setRequestBusyId("");
+    }
+  }
+
+  async function handleClearRejected(notificationId: string) {
+    try {
+      setRequestBusyId(notificationId);
+      await clearRejectedJoinRequest(notificationId);
+      await loadTeams(true);
+    } catch (err) {
+      Alert.alert("Could not clear request", err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setRequestBusyId("");
+    }
+  }
+
   return (
     <ScreenShell refreshing={refreshing} onRefresh={() => loadTeams(true)}>
       <ThemedView style={styles.container}>
@@ -148,7 +196,7 @@ export default function TeamsScreen() {
               Teams
             </ThemedText>
             <ThemedText themeColor="textSecondary">
-              Shared workspaces, member roles, attendance, and team task visibility.
+              Shared workspaces, member roles, attendance, team tasks, extensions, and conference entry points.
             </ThemedText>
           </ThemedView>
 
@@ -161,9 +209,9 @@ export default function TeamsScreen() {
             </GlassView>
             <GlassView style={styles.heroStatCard}>
               <ThemedText type="small" themeColor="textSecondary">
-                Pending
+                Requests
               </ThemedText>
-              <ThemedText type="subtitle">{teamStats.pending}</ThemedText>
+              <ThemedText type="subtitle">{pendingRequests.length + rejectedRequests.length}</ThemedText>
             </GlassView>
           </ThemedView>
         </GlassView>
@@ -183,7 +231,7 @@ export default function TeamsScreen() {
           </GlassView>
         </ThemedView>
 
-        <GlassView style={styles.createCard}>
+        <GlassView style={[styles.createCard, action === "create" ? styles.focusCard : null]}>
           <ThemedText type="smallBold" themeColor="textSecondary">
             Create workspace
           </ThemedText>
@@ -221,7 +269,7 @@ export default function TeamsScreen() {
           </Pressable>
         </GlassView>
 
-        <GlassView style={styles.createCard}>
+        <GlassView style={[styles.createCard, action === "join" ? styles.focusCard : null]}>
           <ThemedText type="smallBold" themeColor="textSecondary">
             Join workspace
           </ThemedText>
@@ -241,6 +289,49 @@ export default function TeamsScreen() {
           </Pressable>
         </GlassView>
 
+        {pendingRequests.length || rejectedRequests.length ? (
+          <GlassView style={styles.requestCard}>
+            <ThemedText type="smallBold" themeColor="textSecondary">
+              My Requests
+            </ThemedText>
+
+            {pendingRequests.map((request) => (
+              <ThemedView key={`pending-${request.teamId}`} style={styles.requestItem}>
+                <ThemedView style={[styles.requestAccent, { backgroundColor: request.teamColor || theme.primary }]} />
+                <ThemedView style={styles.requestCopy}>
+                  <ThemedText>{request.teamName}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Waiting for approval
+                  </ThemedText>
+                </ThemedView>
+                <Pressable onPress={() => handleRetractRequest(request.teamId)} disabled={Boolean(requestBusyId)} style={styles.requestButton}>
+                  <ThemedText type="smallBold">{requestBusyId === request.teamId ? "Working..." : "Retract"}</ThemedText>
+                </Pressable>
+              </ThemedView>
+            ))}
+
+            {rejectedRequests.map((request) => (
+              <ThemedView key={`rejected-${request.notificationId || request.teamId}`} style={styles.requestItem}>
+                <ThemedView style={[styles.requestAccent, { backgroundColor: Brand.warning }]} />
+                <ThemedView style={styles.requestCopy}>
+                  <ThemedText>{request.teamName}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {request.message || "Your join request was rejected."}
+                  </ThemedText>
+                </ThemedView>
+                <Pressable
+                  onPress={() => request.notificationId && handleClearRejected(request.notificationId)}
+                  disabled={Boolean(requestBusyId)}
+                  style={styles.requestButton}>
+                  <ThemedText type="smallBold">
+                    {requestBusyId === request.notificationId ? "Working..." : "Clear"}
+                  </ThemedText>
+                </Pressable>
+              </ThemedView>
+            ))}
+          </GlassView>
+        ) : null}
+
         {loading ? (
           <ThemedView style={styles.loadingWrap}>
             <ActivityIndicator size="large" color={theme.textSecondary} />
@@ -259,16 +350,14 @@ export default function TeamsScreen() {
         <ThemedView style={styles.teamList}>
           {teams.length ? (
             teams.map((team) => (
-              <Pressable
-                key={team.id}
-                onPress={() =>
-                  router.push({
-                    pathname: "/team/[teamId]",
-                    params: { teamId: team.id },
-                  })
-                }
-                style={styles.teamPressable}>
-                <GlassView style={styles.teamCard}>
+              <GlassView key={team.id} style={styles.teamCard}>
+                <Pressable
+                  onPress={() =>
+                    router.push({
+                      pathname: "/team/[teamId]",
+                      params: { teamId: team.id, section: "overview" },
+                    })
+                  }>
                   <ThemedView style={styles.teamHeader}>
                     <ThemedView style={[styles.colorBadge, { backgroundColor: team.color }]} />
                     <ThemedView style={styles.teamCopy}>
@@ -289,21 +378,29 @@ export default function TeamsScreen() {
                       </ThemedText>
                     </ThemedView>
                   </ThemedView>
+                </Pressable>
 
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {team.description || "No description yet."}
-                  </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {team.description || "No description yet."}
+                </ThemedText>
 
-                  <ThemedView style={styles.teamFooter}>
-                    <ThemedText type="smallBold" style={{ color: team.color }}>
-                      Open workspace
-                    </ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Attendance, tasks, invite flow
-                    </ThemedText>
-                  </ThemedView>
-                </GlassView>
-              </Pressable>
+                <ThemedView style={styles.quickActionRow}>
+                  <Pressable onPress={() => router.push({ pathname: "/team/[teamId]", params: { teamId: team.id, section: "tasks" } })} style={styles.quickActionChip}>
+                    <ThemedText type="smallBold">Tasks</ThemedText>
+                  </Pressable>
+                  <Pressable onPress={() => router.push({ pathname: "/team/[teamId]", params: { teamId: team.id, section: "members" } })} style={styles.quickActionChip}>
+                    <ThemedText type="smallBold">Members</ThemedText>
+                  </Pressable>
+                  <Pressable onPress={() => router.push({ pathname: "/team/[teamId]", params: { teamId: team.id, section: "conference" } })} style={styles.quickActionChip}>
+                    <ThemedText type="smallBold">Conference</ThemedText>
+                  </Pressable>
+                  {(team.isAdmin || team.myRole === "manager") ? (
+                    <Pressable onPress={() => router.push({ pathname: "/team/[teamId]", params: { teamId: team.id, section: "extensions" } })} style={styles.quickActionChip}>
+                      <ThemedText type="smallBold">Extensions</ThemedText>
+                    </Pressable>
+                  ) : null}
+                </ThemedView>
+              </GlassView>
             ))
           ) : (
             <GlassView style={styles.emptyCard}>
@@ -364,6 +461,33 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
+  focusCard: {
+    borderColor: Brand.primary,
+  },
+  requestCard: {
+    padding: Spacing.three,
+    borderRadius: 24,
+    gap: Spacing.two,
+  },
+  requestItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two,
+  },
+  requestAccent: {
+    width: 12,
+    height: 42,
+    borderRadius: 999,
+  },
+  requestCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  requestButton: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: 999,
+  },
   input: {
     borderWidth: 1,
     borderRadius: 14,
@@ -401,9 +525,6 @@ const styles = StyleSheet.create({
   teamList: {
     gap: Spacing.two,
   },
-  teamPressable: {
-    borderRadius: 24,
-  },
   teamCard: {
     padding: Spacing.three,
     borderRadius: 24,
@@ -428,11 +549,15 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.one,
     borderRadius: 999,
   },
-  teamFooter: {
+  quickActionRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexWrap: "wrap",
     gap: Spacing.two,
+  },
+  quickActionChip: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: 999,
   },
   emptyCard: {
     padding: Spacing.four,

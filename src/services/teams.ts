@@ -1,8 +1,10 @@
 import { apiRequest } from "@/services/api";
 import {
+  normalizeJoinRequestNotice,
   normalizeAttendance,
   normalizeTeamDetail,
   normalizeTeamSummary,
+  type JoinRequestNotice,
   type TeamAttendance,
   type TeamDetail,
   type TeamSummary,
@@ -33,6 +35,31 @@ export async function createTeam(data: {
 export async function joinTeam(teamId: string) {
   return apiRequest<{ message?: string; status?: string }>(`/api/teams/${teamId}/join`, {
     method: "POST",
+    auth: true,
+  });
+}
+
+export async function getMyJoinRequests() {
+  const payload = await apiRequest<{ pending?: TeamPayload[]; rejected?: TeamPayload[] }>("/api/teams/join-requests/mine", {
+    auth: true,
+  });
+
+  return {
+    pending: Array.isArray(payload.pending) ? payload.pending.map((entry) => normalizeJoinRequestNotice(entry)) : [],
+    rejected: Array.isArray(payload.rejected) ? payload.rejected.map((entry) => normalizeJoinRequestNotice(entry)) : [],
+  };
+}
+
+export async function retractJoinRequest(teamId: string) {
+  return apiRequest<{ message?: string }>(`/api/teams/${teamId}/join/retract`, {
+    method: "POST",
+    auth: true,
+  });
+}
+
+export async function clearRejectedJoinRequest(notificationId: string) {
+  return apiRequest<{ message?: string }>(`/api/teams/join-requests/rejected/${notificationId}`, {
+    method: "DELETE",
     auth: true,
   });
 }
@@ -106,4 +133,4 @@ export async function getConferenceStatus(teamId: string) {
   });
 }
 
-export type { TeamAttendance, TeamDetail, TeamSummary };
+export type { JoinRequestNotice, TeamAttendance, TeamDetail, TeamSummary };

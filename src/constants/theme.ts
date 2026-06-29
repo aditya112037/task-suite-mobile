@@ -183,6 +183,32 @@ export const ThemePresets = {
       tabSurface: 'rgba(255,255,255,0.92)',
     } satisfies ThemePalette,
   },
+  'midnight-neon': {
+    label: 'Midnight Neon',
+    palette: {
+      mode: 'dark',
+      text: '#eff6ff',
+      background: '#050816',
+      backgroundElement: 'rgba(12, 18, 38, 0.82)',
+      backgroundSelected: 'rgba(95, 242, 255, 0.18)',
+      textSecondary: '#97a6d8',
+      primary: '#5ff2ff',
+      primaryLight: '#9cf7ff',
+      primaryDark: '#1ba9d6',
+      secondary: '#ff4fd8',
+      secondaryLight: '#ff91e8',
+      secondaryDark: '#c928a6',
+      divider: 'rgba(126, 149, 255, 0.18)',
+      pageBackgroundColor: '#050816',
+      pageGradient: ['#040611', '#050816', '#0b1030'],
+      pageGlowPrimary: 'rgba(95, 242, 255, 0.22)',
+      pageGlowSecondary: 'rgba(255, 79, 216, 0.18)',
+      cardBorder: 'rgba(116, 137, 255, 0.18)',
+      headerSurface: 'rgba(5, 10, 24, 0.84)',
+      heroSurface: 'rgba(11, 16, 48, 0.76)',
+      tabSurface: 'rgba(7, 11, 27, 0.94)',
+    } satisfies ThemePalette,
+  },
 } as const;
 
 export type ThemePresetKey = keyof typeof ThemePresets;
