@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
 import { SymbolView } from "expo-symbols";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput } from "react-native";
+import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput, useWindowDimensions } from "react-native";
 
 import { AppCard } from "@/components/app-card";
 import { ScreenShell } from "@/components/screen-shell";
@@ -46,6 +46,7 @@ function isDueSoon(value: string | null) {
 export default function HomeIntentScreen() {
   const theme = useTheme();
   const { signOut } = useAuth();
+  const { width, height } = useWindowDimensions();
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [teams, setTeams] = useState<TeamSummary[]>([]);
   const [personalTasks, setPersonalTasks] = useState<PersonalTask[]>([]);
@@ -56,6 +57,9 @@ export default function HomeIntentScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isCompact = height < 780 || width < 390;
+  const isShort = height < 720;
+  const promptLimit = isShort ? 5 : isCompact ? 6 : 8;
 
   const assignedTasks = useMemo(() => {
     if (!profile) return [];
@@ -78,7 +82,7 @@ export default function HomeIntentScreen() {
     () => getIntentPrompts({ signedIn: true, hasTeamAccess, hasAdminTeamAccess }),
     [hasAdminTeamAccess, hasTeamAccess]
   );
-  const suggestions = useMemo(() => getIntentSuggestions(commandText, prompts), [commandText, prompts]);
+  const suggestions = useMemo(() => getIntentSuggestions(commandText, prompts).slice(0, promptLimit), [commandText, prompts, promptLimit]);
 
   const loadHome = useCallback(
     async (isRefresh = false) => {
@@ -252,13 +256,13 @@ export default function HomeIntentScreen() {
 
   return (
     <ScreenShell refreshing={refreshing} onRefresh={() => loadHome(true)}>
-      <ThemedView style={styles.container}>
-        <AppCard variant="hero" style={styles.heroCard}>
+      <ThemedView style={[styles.container, isCompact ? styles.containerCompact : null]}>
+        <AppCard variant="hero" style={[styles.heroCard, isCompact ? styles.heroCardCompact : null]}>
           <ThemedView style={styles.heroCopy}>
             <ThemedText type="smallBold" themeColor="textSecondary">
               INTENT GUIDANCE ENGINE
             </ThemedText>
-            <ThemedText type="subtitle" style={styles.heroTitle}>
+            <ThemedText type="subtitle" style={[styles.heroTitle, isCompact ? styles.heroTitleCompact : null]}>
               {profile ? `What do you want to move, ${profile.name.split(" ")[0]}?` : "What do you want to move today?"}
             </ThemedText>
             <ThemedText themeColor="textSecondary">
@@ -273,7 +277,7 @@ export default function HomeIntentScreen() {
               placeholder="Try: create task, team members, extensions, profile, plan my day"
               placeholderTextColor={theme.textSecondary}
               onSubmitEditing={() => void runCommand(commandText)}
-              style={[styles.commandInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
+              style={[styles.commandInput, isCompact ? styles.commandInputCompact : null, { color: theme.text, borderColor: theme.backgroundSelected }]}
             />
             <ThemedView style={styles.commandActions}>
               <Pressable onPress={() => void runCommand(commandText)} style={[styles.primaryButton, { backgroundColor: theme.primary }]}>
@@ -307,7 +311,7 @@ export default function HomeIntentScreen() {
                 setCommandText(prompt);
                 void runCommand(prompt);
               }}
-              style={[styles.promptChip, { backgroundColor: theme.backgroundElement }]}>
+              style={[styles.promptChip, isCompact ? styles.promptChipCompact : null, { backgroundColor: theme.backgroundElement }]}>
               <ThemedText type="smallBold">{prompt}</ThemedText>
             </Pressable>
           ))}
@@ -444,25 +448,25 @@ export default function HomeIntentScreen() {
 
         {profile ? (
           <ThemedView style={styles.metricGrid}>
-            <AppCard style={styles.metricCard}>
+            <AppCard style={[styles.metricCard, isCompact ? styles.metricCardCompact : null]}>
               <ThemedText type="small" themeColor="textSecondary">
                 Completion rate
               </ThemedText>
               <ThemedText type="subtitle">{Math.round(profile.progress.completionRate)}%</ThemedText>
             </AppCard>
-            <AppCard style={styles.metricCard}>
+            <AppCard style={[styles.metricCard, isCompact ? styles.metricCardCompact : null]}>
               <ThemedText type="small" themeColor="textSecondary">
                 Assigned work
               </ThemedText>
               <ThemedText type="subtitle">{profile.progress.assignedTasks}</ThemedText>
             </AppCard>
-            <AppCard style={styles.metricCard}>
+            <AppCard style={[styles.metricCard, isCompact ? styles.metricCardCompact : null]}>
               <ThemedText type="small" themeColor="textSecondary">
                 Teams
               </ThemedText>
               <ThemedText type="subtitle">{teams.length}</ThemedText>
             </AppCard>
-            <AppCard style={styles.metricCard}>
+            <AppCard style={[styles.metricCard, isCompact ? styles.metricCardCompact : null]}>
               <ThemedText type="small" themeColor="textSecondary">
                 Due soon
               </ThemedText>
@@ -549,6 +553,9 @@ const styles = StyleSheet.create({
   container: {
     gap: Spacing.three,
   },
+  containerCompact: {
+    gap: 12,
+  },
   heroCard: {
     padding: Spacing.four,
     borderRadius: 28,
@@ -556,12 +563,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
+  heroCardCompact: {
+    padding: Spacing.three,
+    borderRadius: 22,
+    gap: 12,
+  },
   heroCopy: {
     gap: Spacing.two,
   },
   heroTitle: {
     fontSize: 34,
     lineHeight: 40,
+  },
+  heroTitleCompact: {
+    fontSize: 28,
+    lineHeight: 34,
   },
   commandCard: {
     gap: Spacing.two,
@@ -573,6 +589,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
     fontSize: 16,
+  },
+  commandInputCompact: {
+    paddingVertical: 12,
+    fontSize: 15,
   },
   commandActions: {
     flexDirection: "row",
@@ -603,6 +623,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     borderRadius: 999,
+  },
+  promptChipCompact: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
   },
   workflowCard: {
     borderRadius: 24,
@@ -663,6 +687,10 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     borderRadius: 22,
     gap: Spacing.one,
+  },
+  metricCardCompact: {
+    padding: 12,
+    borderRadius: 18,
   },
   reminderCard: {
     flexDirection: "row",

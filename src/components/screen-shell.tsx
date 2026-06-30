@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { ReactNode } from "react";
-import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BottomTabInset, MaxContentWidth, Spacing } from "@/constants/theme";
@@ -23,12 +23,23 @@ export function ScreenShell({
 }: ScreenShellProps) {
   const theme = useTheme();
   const safeAreaInsets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const isCompact = width < 390 || height < 780;
+  const isShort = height < 720;
+  const horizontalPadding = isCompact ? Spacing.three : Spacing.four;
+  const topPadding = topInset
+    ? safeAreaInsets.top + (isCompact ? Spacing.three : Spacing.four)
+    : isCompact
+      ? Spacing.two
+      : Spacing.four;
+  const bottomPadding =
+    safeAreaInsets.bottom + (isShort ? Spacing.three : Spacing.five) + (includeTabInset ? BottomTabInset : 0);
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
       <LinearGradient colors={[...theme.pageGradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-      <View style={[styles.glow, styles.glowLeft, { backgroundColor: theme.pageGlowPrimary }]} />
-      <View style={[styles.glow, styles.glowRight, { backgroundColor: theme.pageGlowSecondary }]} />
+      <View style={[styles.glow, isCompact ? styles.glowCompact : null, styles.glowLeft, { backgroundColor: theme.pageGlowPrimary }]} />
+      <View style={[styles.glow, isCompact ? styles.glowCompact : null, styles.glowRight, { backgroundColor: theme.pageGlowSecondary }]} />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.contentContainer}
@@ -39,8 +50,9 @@ export function ScreenShell({
           style={[
             styles.container,
             {
-              paddingTop: topInset ? safeAreaInsets.top + Spacing.four : Spacing.four,
-              paddingBottom: safeAreaInsets.bottom + Spacing.five + (includeTabInset ? BottomTabInset : 0),
+              paddingTop: topPadding,
+              paddingBottom: bottomPadding,
+              paddingHorizontal: horizontalPadding,
             },
           ]}>
           {children}
@@ -64,7 +76,6 @@ const styles = StyleSheet.create({
   container: {
     width: "100%",
     maxWidth: MaxContentWidth,
-    paddingHorizontal: Spacing.four,
     gap: Spacing.three,
   },
   glow: {
@@ -72,6 +83,10 @@ const styles = StyleSheet.create({
     width: 260,
     height: 260,
     borderRadius: 999,
+  },
+  glowCompact: {
+    width: 220,
+    height: 220,
   },
   glowLeft: {
     top: -48,

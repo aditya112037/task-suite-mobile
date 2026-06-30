@@ -30,7 +30,8 @@ export default function HomePage() {
   const [showAllPrompts, setShowAllPrompts] = useState(false);
   const isCompact = height < 780 || width < 380;
   const isShort = height < 720;
-  const promptLimit = isShort ? 4 : isCompact ? 6 : 8;
+  const isTiny = height < 690 || width < 360;
+  const promptLimit = isTiny ? 3 : isShort ? 4 : isCompact ? 6 : 8;
 
   const isLoggedIn = hasToken === true;
   const prompts = useMemo(
@@ -120,7 +121,7 @@ export default function HomePage() {
 
   return (
     <ScreenShell includeTabInset={false} topInset={false}>
-      <ThemedView style={[styles.container, isCompact ? styles.containerCompact : null]}>
+      <ThemedView style={[styles.container, isCompact ? styles.containerCompact : null, isTiny ? styles.containerTiny : null]}>
         <ThemedView style={styles.header}>
           <ThemedView style={styles.brandBlock}>
             <ThemedText
@@ -141,30 +142,38 @@ export default function HomePage() {
               isCompact ? styles.avatarButtonCompact : null,
               { borderColor: theme.cardBorder, backgroundColor: theme.backgroundElement },
             ]}>
-            <ThemedText style={styles.avatarEmoji}>☆</ThemedText>
+            <ThemedText style={[styles.avatarEmoji, isTiny ? styles.avatarEmojiTiny : null]}>☆</ThemedText>
           </Pressable>
         </ThemedView>
 
-        <ThemedView style={[styles.badge, { backgroundColor: theme.backgroundElement, borderColor: theme.cardBorder }]}>
-          <ThemedText style={styles.badgeSpark}>✦</ThemedText>
+        <ThemedView
+          style={[
+            styles.badge,
+            isCompact ? styles.badgeCompact : null,
+            { backgroundColor: theme.backgroundElement, borderColor: theme.cardBorder },
+          ]}>
+          <ThemedText style={[styles.badgeSpark, isCompact ? styles.badgeSparkCompact : null]}>✦</ThemedText>
           <ThemedText type="small">
             Workspace <ThemedText type="smallBold" style={{ color: theme.primary }}>For Everything</ThemedText>
           </ThemedText>
         </ThemedView>
 
-        <ThemedText
-          style={[
-            styles.tagline,
-            isCompact ? styles.taglineCompact : null,
-            { fontFamily: Fonts.serif, color: theme.textSecondary },
-          ]}>
-          Guiding users diversifying needs
-        </ThemedText>
+        {!isTiny ? (
+          <ThemedText
+            style={[
+              styles.tagline,
+              isCompact ? styles.taglineCompact : null,
+              { fontFamily: Fonts.serif, color: theme.textSecondary },
+            ]}>
+            Guiding users diversifying needs
+          </ThemedText>
+        ) : null}
 
         <ThemedView
           style={[
             styles.searchShell,
             isCompact ? styles.searchShellCompact : null,
+            isTiny ? styles.searchShellTiny : null,
             { borderColor: theme.primaryLight, backgroundColor: "rgba(255,255,255,0.28)" },
           ]}>
           <TextInput
@@ -176,23 +185,35 @@ export default function HomePage() {
             placeholder="what's on your mind?"
             placeholderTextColor={theme.textSecondary}
             onSubmitEditing={() => void runCommand(commandText)}
-            style={[styles.commandInput, isCompact ? styles.commandInputCompact : null, { color: theme.text }]}
+            style={[
+              styles.commandInput,
+              isCompact ? styles.commandInputCompact : null,
+              isTiny ? styles.commandInputTiny : null,
+              { color: theme.text },
+            ]}
           />
           <Pressable
             onPress={() => void runCommand(commandText)}
-            style={[styles.searchButton, isCompact ? styles.searchButtonCompact : null, { backgroundColor: "rgba(255,255,255,0.34)" }]}>
+            style={[
+              styles.searchButton,
+              isCompact ? styles.searchButtonCompact : null,
+              isTiny ? styles.searchButtonTiny : null,
+              { backgroundColor: "rgba(255,255,255,0.34)" },
+            ]}>
             <SymbolView name={{ ios: "magnifyingglass", android: "search" }} size={24} tintColor={theme.primary} />
           </Pressable>
         </ThemedView>
 
-        <ThemedView style={styles.featureRow}>
-          <ThemedText style={[styles.featureSpark, { color: theme.primary }]}>✦</ThemedText>
-          <ThemedText type="smallBold" style={{ color: theme.primary }}>
-            7 new features available
-          </ThemedText>
-        </ThemedView>
+        {!isTiny ? (
+          <ThemedView style={styles.featureRow}>
+            <ThemedText style={[styles.featureSpark, { color: theme.primary }]}>✦</ThemedText>
+            <ThemedText type="smallBold" style={{ color: theme.primary }}>
+              7 new features available
+            </ThemedText>
+          </ThemedView>
+        ) : null}
 
-        <ThemedText type="subtitle" style={[styles.pitch, isCompact ? styles.pitchCompact : null]}>
+        <ThemedText type="subtitle" style={[styles.pitch, isCompact ? styles.pitchCompact : null, isTiny ? styles.pitchTiny : null]}>
           Build a workspace for tasks, teams, deadlines, and the work that moves between them.
         </ThemedText>
 
@@ -206,6 +227,7 @@ export default function HomePage() {
               }}
               style={[
                 styles.promptChip,
+                isTiny ? styles.promptChipTiny : null,
                 {
                   backgroundColor: index === 0 && workflow?.key === "plan" ? "rgba(95, 242, 255, 0.12)" : theme.backgroundElement,
                   borderColor: theme.primaryLight,
@@ -217,13 +239,15 @@ export default function HomePage() {
           ))}
         </ThemedView>
 
-        {hiddenPromptCount > 0 ? (
+        {hiddenPromptCount > 0 && !isTiny ? (
           <Pressable onPress={() => setShowAllPrompts(true)} style={styles.showMoreButton}>
             <ThemedText type="smallBold">Show {hiddenPromptCount} more prompts</ThemedText>
           </Pressable>
         ) : null}
 
-        <Pressable onPress={() => (isLoggedIn ? router.push("/(tabs)") : requireAuth())} style={[styles.primaryCta, { backgroundColor: theme.primary }]}>
+        <Pressable
+          onPress={() => (isLoggedIn ? router.push("/(tabs)") : requireAuth())}
+          style={[styles.primaryCta, isTiny ? styles.primaryCtaTiny : null, { backgroundColor: theme.primary }]}>
           <SymbolView name={{ ios: "square.grid.2x2.fill", android: "dashboard" }} size={20} tintColor="#f5f1ea" />
           <ThemedText type="smallBold" style={[styles.primaryCtaText, isCompact ? styles.primaryCtaTextCompact : null]}>
             Straight to dashboard
@@ -235,16 +259,23 @@ export default function HomePage() {
             setWorkflow({ key: "plan" });
             setCommandFeedback("Choose a starting point below.");
           }}
-          style={[styles.secondaryCta, { borderColor: theme.cardBorder, backgroundColor: "rgba(255,255,255,0.32)" }]}>
+          style={[styles.secondaryCta, isTiny ? styles.secondaryCtaTiny : null, { borderColor: theme.cardBorder, backgroundColor: "rgba(255,255,255,0.32)" }]}>
           <ThemedText type="smallBold">Get started</ThemedText>
         </Pressable>
 
-        <ThemedText themeColor="textSecondary" style={styles.poweredBy}>
+        {!isTiny ? (
+          <ThemedText themeColor="textSecondary" style={styles.poweredBy}>
           powered by Intent Guidance Engine
-        </ThemedText>
+          </ThemedText>
+        ) : null}
 
         {workflow?.key === "plan" ? (
-          <ThemedView style={[styles.workflowPanel, { backgroundColor: theme.backgroundElement, borderColor: theme.cardBorder }]}>
+          <ThemedView
+            style={[
+              styles.workflowPanel,
+              isTiny ? styles.workflowPanelTiny : null,
+              { backgroundColor: theme.backgroundElement, borderColor: theme.cardBorder },
+            ]}>
             <ThemedText type="smallBold">Choose your lane</ThemedText>
             <ThemedText themeColor="textSecondary">{commandFeedback}</ThemedText>
             <ThemedView style={styles.workflowActions}>
@@ -281,6 +312,10 @@ const styles = StyleSheet.create({
   containerCompact: {
     gap: Spacing.three,
     paddingTop: Spacing.one,
+  },
+  containerTiny: {
+    gap: 12,
+    paddingTop: 2,
   },
   header: {
     flexDirection: "row",
@@ -322,6 +357,9 @@ const styles = StyleSheet.create({
   avatarEmoji: {
     fontSize: 20,
   },
+  avatarEmojiTiny: {
+    fontSize: 16,
+  },
   badge: {
     alignSelf: "center",
     flexDirection: "row",
@@ -332,9 +370,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: 10,
   },
+  badgeCompact: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
   badgeSpark: {
     fontSize: 18,
     lineHeight: 22,
+  },
+  badgeSparkCompact: {
+    fontSize: 15,
+    lineHeight: 18,
   },
   tagline: {
     textAlign: "center",
@@ -364,6 +410,12 @@ const styles = StyleSheet.create({
     minHeight: 76,
     paddingLeft: Spacing.three,
   },
+  searchShellTiny: {
+    minHeight: 64,
+    paddingLeft: 14,
+    paddingRight: 6,
+    paddingVertical: 6,
+  },
   commandInput: {
     flex: 1,
     fontSize: 22,
@@ -373,6 +425,11 @@ const styles = StyleSheet.create({
   commandInputCompact: {
     fontSize: 18,
     lineHeight: 24,
+  },
+  commandInputTiny: {
+    fontSize: 16,
+    lineHeight: 20,
+    paddingVertical: 4,
   },
   searchButton: {
     width: 64,
@@ -384,6 +441,10 @@ const styles = StyleSheet.create({
   searchButtonCompact: {
     width: 54,
     height: 54,
+  },
+  searchButtonTiny: {
+    width: 46,
+    height: 46,
   },
   featureRow: {
     flexDirection: "row",
@@ -403,6 +464,10 @@ const styles = StyleSheet.create({
     fontSize: 22,
     lineHeight: 32,
   },
+  pitchTiny: {
+    fontSize: 20,
+    lineHeight: 28,
+  },
   promptWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -417,6 +482,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: Spacing.three,
     paddingVertical: 12,
+  },
+  promptChipTiny: {
+    paddingHorizontal: 12,
+    paddingVertical: 9,
   },
   promptDot: {
     width: 10,
@@ -436,6 +505,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: Spacing.two,
   },
+  primaryCtaTiny: {
+    minHeight: 56,
+  },
   primaryCtaText: {
     color: "#f5f1ea",
     fontSize: 16,
@@ -450,6 +522,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  secondaryCtaTiny: {
+    minHeight: 48,
+  },
   poweredBy: {
     textAlign: "center",
     fontSize: 14,
@@ -459,6 +534,11 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: Spacing.three,
     gap: Spacing.two,
+  },
+  workflowPanelTiny: {
+    borderRadius: 18,
+    padding: 12,
+    gap: 10,
   },
   workflowActions: {
     flexDirection: "row",

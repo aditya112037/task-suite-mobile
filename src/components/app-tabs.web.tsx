@@ -6,7 +6,7 @@ import {
   TabTriggerSlotProps,
   TabListProps,
 } from 'expo-router/ui';
-import { Pressable, View, StyleSheet } from 'react-native';
+import { Pressable, View, StyleSheet, useWindowDimensions } from 'react-native';
 
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
@@ -54,11 +54,15 @@ export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps
 
 export function CustomTabList(props: TabListProps) {
   const theme = useTheme();
+  const { width, height } = useWindowDimensions();
+  const isCompact = width < 430 || height < 780;
 
   return (
-    <View {...props} style={styles.tabListContainer}>
-      <ThemedView type="backgroundElement" style={[styles.innerContainer, { borderColor: theme.cardBorder }]}>
-        <ThemedText type="smallBold" style={[styles.brandText, { color: theme.primary }]}>
+    <View {...props} style={[styles.tabListContainer, isCompact ? styles.tabListContainerCompact : null]}>
+      <ThemedView
+        type="backgroundElement"
+        style={[styles.innerContainer, isCompact ? styles.innerContainerCompact : null, { borderColor: theme.cardBorder }]}>
+        <ThemedText type="smallBold" style={[styles.brandText, isCompact ? styles.brandTextCompact : null, { color: theme.primary }]}>
           Task Suite
         </ThemedText>
 
@@ -81,6 +85,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     pointerEvents: 'box-none',
   },
+  tabListContainerCompact: {
+    paddingHorizontal: Spacing.two,
+    paddingBottom: Spacing.two,
+  },
   innerContainer: {
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.three,
@@ -93,9 +101,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     pointerEvents: 'auto',
   },
+  innerContainerCompact: {
+    paddingVertical: 6,
+    paddingHorizontal: Spacing.two,
+    gap: 6,
+  },
   brandText: {
     marginRight: 'auto',
     paddingLeft: Spacing.one,
+  },
+  brandTextCompact: {
+    fontSize: 12,
   },
   pressed: {
     opacity: 0.7,
