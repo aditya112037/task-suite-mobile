@@ -120,8 +120,8 @@ export default function HomePage() {
   }
 
   return (
-    <ScreenShell includeTabInset={false} topInset={false}>
-      <ThemedView style={[styles.container, isCompact ? styles.containerCompact : null, isTiny ? styles.containerTiny : null]}>
+    <ScreenShell includeTabInset={false} topInset={false} fitToScreen>
+      <ThemedView style={styles.container}>
         <ThemedView style={styles.header}>
           <ThemedView style={styles.brandBlock}>
             <ThemedText
@@ -306,16 +306,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   container: {
-    gap: Spacing.four,
-    paddingTop: Spacing.three,
-  },
-  containerCompact: {
-    gap: Spacing.three,
-    paddingTop: Spacing.one,
-  },
-  containerTiny: {
-    gap: 12,
-    paddingTop: 2,
+    flex: 1,
+    justifyContent: "space-evenly",
   },
   header: {
     flexDirection: "row",

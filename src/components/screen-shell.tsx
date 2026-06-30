@@ -12,6 +12,7 @@ type ScreenShellProps = {
   onRefresh?: () => void;
   topInset?: boolean;
   includeTabInset?: boolean;
+  fitToScreen?: boolean;
 };
 
 export function ScreenShell({
@@ -20,6 +21,7 @@ export function ScreenShell({
   onRefresh,
   topInset = true,
   includeTabInset = true,
+  fitToScreen = false,
 }: ScreenShellProps) {
   const theme = useTheme();
   const safeAreaInsets = useSafeAreaInsets();
@@ -42,13 +44,15 @@ export function ScreenShell({
       <View style={[styles.glow, isCompact ? styles.glowCompact : null, styles.glowRight, { backgroundColor: theme.pageGlowSecondary }]} />
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.contentContainer}
+        contentContainerStyle={[styles.contentContainer, fitToScreen && styles.contentContainerFit]}
+        scrollEnabled={!fitToScreen}
         refreshControl={
-          onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.textSecondary} /> : undefined
+          onRefresh && !fitToScreen ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.textSecondary} /> : undefined
         }>
         <View
           style={[
             styles.container,
+            fitToScreen && styles.containerFit,
             {
               paddingTop: topPadding,
               paddingBottom: bottomPadding,
@@ -73,10 +77,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
   },
+  contentContainerFit: {
+    flex: 1,
+  },
   container: {
     width: "100%",
     maxWidth: MaxContentWidth,
     gap: Spacing.three,
+  },
+  containerFit: {
+    flex: 1,
+    justifyContent: "space-evenly",
   },
   glow: {
     position: "absolute",
