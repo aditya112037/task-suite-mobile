@@ -308,6 +308,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: "space-evenly",
+    paddingTop: Spacing.four,
   },
   header: {
     flexDirection: "row",
