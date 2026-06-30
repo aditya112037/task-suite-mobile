@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
 import { SymbolView } from "expo-symbols";
 
@@ -23,10 +23,14 @@ type WorkflowState = { key: IntentWorkflow };
 export default function HomePage() {
   const theme = useTheme();
   const { hasToken } = useAuth();
+  const { width, height } = useWindowDimensions();
   const [commandText, setCommandText] = useState("");
   const [commandFeedback, setCommandFeedback] = useState("Search, prompt, and route into the right workspace.");
   const [workflow, setWorkflow] = useState<WorkflowState | null>(null);
   const [showAllPrompts, setShowAllPrompts] = useState(false);
+  const isCompact = height < 780 || width < 380;
+  const isShort = height < 720;
+  const promptLimit = isShort ? 4 : isCompact ? 6 : 8;
 
   const isLoggedIn = hasToken === true;
   const prompts = useMemo(
@@ -34,7 +38,7 @@ export default function HomePage() {
     [isLoggedIn]
   );
   const suggestions = useMemo(() => getIntentSuggestions(commandText, prompts), [commandText, prompts]);
-  const visiblePrompts = showAllPrompts ? prompts : suggestions.length ? suggestions : prompts.slice(0, 8);
+  const visiblePrompts = showAllPrompts ? prompts : suggestions.length ? suggestions.slice(0, promptLimit) : prompts.slice(0, promptLimit);
   const hiddenPromptCount = Math.max(prompts.length - visiblePrompts.length, 0);
 
   useEffect(() => {
@@ -115,17 +119,28 @@ export default function HomePage() {
   }
 
   return (
-    <ScreenShell includeTabInset={false}>
-      <ThemedView style={styles.container}>
+    <ScreenShell includeTabInset={false} topInset={false}>
+      <ThemedView style={[styles.container, isCompact ? styles.containerCompact : null]}>
         <ThemedView style={styles.header}>
           <ThemedView style={styles.brandBlock}>
-            <ThemedText style={[styles.brand, { fontFamily: Fonts.serif, color: theme.text }]}>TaskSuite</ThemedText>
+            <ThemedText
+              style={[
+                styles.brand,
+                isCompact ? styles.brandCompact : null,
+                { fontFamily: Fonts.serif, color: theme.text },
+              ]}>
+              TaskSuite
+            </ThemedText>
             <ThemedText style={[styles.brandMark, { color: theme.textSecondary }]}>TM</ThemedText>
           </ThemedView>
 
           <Pressable
             onPress={() => router.push("/(auth)/login")}
-            style={[styles.avatarButton, { borderColor: theme.cardBorder, backgroundColor: theme.backgroundElement }]}>
+            style={[
+              styles.avatarButton,
+              isCompact ? styles.avatarButtonCompact : null,
+              { borderColor: theme.cardBorder, backgroundColor: theme.backgroundElement },
+            ]}>
             <ThemedText style={styles.avatarEmoji}>☆</ThemedText>
           </Pressable>
         </ThemedView>
@@ -137,11 +152,21 @@ export default function HomePage() {
           </ThemedText>
         </ThemedView>
 
-        <ThemedText style={[styles.tagline, { fontFamily: Fonts.serif, color: theme.textSecondary }]}>
+        <ThemedText
+          style={[
+            styles.tagline,
+            isCompact ? styles.taglineCompact : null,
+            { fontFamily: Fonts.serif, color: theme.textSecondary },
+          ]}>
           Guiding users diversifying needs
         </ThemedText>
 
-        <ThemedView style={[styles.searchShell, { borderColor: theme.primaryLight, backgroundColor: "rgba(255,255,255,0.28)" }]}>
+        <ThemedView
+          style={[
+            styles.searchShell,
+            isCompact ? styles.searchShellCompact : null,
+            { borderColor: theme.primaryLight, backgroundColor: "rgba(255,255,255,0.28)" },
+          ]}>
           <TextInput
             value={commandText}
             onChangeText={(value) => {
@@ -151,9 +176,11 @@ export default function HomePage() {
             placeholder="what's on your mind?"
             placeholderTextColor={theme.textSecondary}
             onSubmitEditing={() => void runCommand(commandText)}
-            style={[styles.commandInput, { color: theme.text }]}
+            style={[styles.commandInput, isCompact ? styles.commandInputCompact : null, { color: theme.text }]}
           />
-          <Pressable onPress={() => void runCommand(commandText)} style={[styles.searchButton, { backgroundColor: "rgba(255,255,255,0.34)" }]}>
+          <Pressable
+            onPress={() => void runCommand(commandText)}
+            style={[styles.searchButton, isCompact ? styles.searchButtonCompact : null, { backgroundColor: "rgba(255,255,255,0.34)" }]}>
             <SymbolView name={{ ios: "magnifyingglass", android: "search" }} size={24} tintColor={theme.primary} />
           </Pressable>
         </ThemedView>
@@ -165,7 +192,7 @@ export default function HomePage() {
           </ThemedText>
         </ThemedView>
 
-        <ThemedText type="subtitle" style={styles.pitch}>
+        <ThemedText type="subtitle" style={[styles.pitch, isCompact ? styles.pitchCompact : null]}>
           Build a workspace for tasks, teams, deadlines, and the work that moves between them.
         </ThemedText>
 
@@ -198,7 +225,7 @@ export default function HomePage() {
 
         <Pressable onPress={() => (isLoggedIn ? router.push("/(tabs)") : requireAuth())} style={[styles.primaryCta, { backgroundColor: theme.primary }]}>
           <SymbolView name={{ ios: "square.grid.2x2.fill", android: "dashboard" }} size={20} tintColor="#f5f1ea" />
-          <ThemedText type="smallBold" style={styles.primaryCtaText}>
+          <ThemedText type="smallBold" style={[styles.primaryCtaText, isCompact ? styles.primaryCtaTextCompact : null]}>
             Straight to dashboard
           </ThemedText>
         </Pressable>
@@ -249,6 +276,10 @@ const styles = StyleSheet.create({
   },
   container: {
     gap: Spacing.four,
+    paddingTop: Spacing.three,
+  },
+  containerCompact: {
+    gap: Spacing.three,
     paddingTop: Spacing.one,
   },
   header: {
@@ -266,6 +297,10 @@ const styles = StyleSheet.create({
     lineHeight: 40,
     fontWeight: "600",
   },
+  brandCompact: {
+    fontSize: 28,
+    lineHeight: 34,
+  },
   brandMark: {
     fontSize: 11,
     lineHeight: 16,
@@ -279,6 +314,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+  avatarButtonCompact: {
+    width: 46,
+    height: 46,
   },
   avatarEmoji: {
     fontSize: 20,
@@ -302,6 +341,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 28,
   },
+  taglineCompact: {
+    fontSize: 16,
+    lineHeight: 24,
+  },
   searchShell: {
     flexDirection: "row",
     alignItems: "center",
@@ -317,11 +360,19 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     elevation: 5,
   },
+  searchShellCompact: {
+    minHeight: 76,
+    paddingLeft: Spacing.three,
+  },
   commandInput: {
     flex: 1,
     fontSize: 22,
     lineHeight: 28,
     paddingVertical: Spacing.two,
+  },
+  commandInputCompact: {
+    fontSize: 18,
+    lineHeight: 24,
   },
   searchButton: {
     width: 64,
@@ -329,6 +380,10 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
+  },
+  searchButtonCompact: {
+    width: 54,
+    height: 54,
   },
   featureRow: {
     flexDirection: "row",
@@ -343,6 +398,10 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 26,
     lineHeight: 38,
+  },
+  pitchCompact: {
+    fontSize: 22,
+    lineHeight: 32,
   },
   promptWrap: {
     flexDirection: "row",
@@ -380,6 +439,9 @@ const styles = StyleSheet.create({
   primaryCtaText: {
     color: "#f5f1ea",
     fontSize: 16,
+  },
+  primaryCtaTextCompact: {
+    fontSize: 15,
   },
   secondaryCta: {
     minHeight: 56,
