@@ -30,22 +30,23 @@ export function ScreenShell({
   const isShort = height < 720;
   const horizontalPadding = isCompact ? Spacing.three : Spacing.four;
   const topPadding = topInset
-    ? safeAreaInsets.top + (isCompact ? Spacing.three : Spacing.four)
+    ? safeAreaInsets.top + (isCompact ? Spacing.two : Spacing.three)
     : isCompact
-      ? Spacing.two
-      : Spacing.four;
+      ? Spacing.one
+      : Spacing.two;
   const bottomPadding =
-    safeAreaInsets.bottom + (isShort ? Spacing.three : Spacing.five) + (includeTabInset ? BottomTabInset : 0);
+    safeAreaInsets.bottom + (isShort ? Spacing.two : Spacing.three) + (includeTabInset ? BottomTabInset : 0);
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
       <LinearGradient colors={[...theme.pageGradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-      <View style={[styles.glow, isCompact ? styles.glowCompact : null, styles.glowLeft, { backgroundColor: theme.pageGlowPrimary }]} />
-      <View style={[styles.glow, isCompact ? styles.glowCompact : null, styles.glowRight, { backgroundColor: theme.pageGlowSecondary }]} />
+      <View style={[styles.glow, styles.glowLeft, { backgroundColor: theme.pageGlowPrimary }]} />
+      <View style={[styles.glow, styles.glowRight, { backgroundColor: theme.pageGlowSecondary }]} />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[styles.contentContainer, fitToScreen && styles.contentContainerFit]}
         scrollEnabled={!fitToScreen}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           onRefresh && !fitToScreen ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.textSecondary} /> : undefined
         }>
@@ -91,20 +92,16 @@ const styles = StyleSheet.create({
   },
   glow: {
     position: "absolute",
-    width: 260,
-    height: 260,
+    width: 200,
+    height: 200,
     borderRadius: 999,
   },
-  glowCompact: {
-    width: 220,
-    height: 220,
-  },
   glowLeft: {
-    top: -48,
-    left: -84,
+    top: -60,
+    left: -80,
   },
   glowRight: {
-    top: 120,
-    right: -120,
+    top: 100,
+    right: -100,
   },
 });

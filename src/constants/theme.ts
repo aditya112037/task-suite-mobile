@@ -45,8 +45,8 @@ export const ThemePresets = {
       divider: 'rgba(12, 28, 38, 0.14)',
       pageBackgroundColor: '#f5f3ee',
       pageGradient: ['#f8f5ef', '#f5f3ee', '#efe9de'],
-      pageGlowPrimary: 'rgba(15, 118, 110, 0.16)',
-      pageGlowSecondary: 'rgba(176, 137, 104, 0.16)',
+      pageGlowPrimary: 'rgba(15, 118, 110, 0.06)',
+      pageGlowSecondary: 'rgba(176, 137, 104, 0.06)',
       cardBorder: 'rgba(12, 28, 38, 0.1)',
       headerSurface: 'rgba(255,255,255,0.7)',
       heroSurface: 'rgba(255,255,255,0.66)',
@@ -71,8 +71,8 @@ export const ThemePresets = {
       divider: 'rgba(210, 222, 233, 0.16)',
       pageBackgroundColor: '#070d14',
       pageGradient: ['#060b12', '#070d14', '#0b141d'],
-      pageGlowPrimary: 'rgba(65, 179, 164, 0.16)',
-      pageGlowSecondary: 'rgba(201, 162, 127, 0.14)',
+      pageGlowPrimary: 'rgba(65, 179, 164, 0.06)',
+      pageGlowSecondary: 'rgba(201, 162, 127, 0.05)',
       cardBorder: 'rgba(210, 222, 233, 0.12)',
       headerSurface: 'rgba(4, 10, 16, 0.82)',
       heroSurface: 'rgba(14,24,35,0.76)',
@@ -97,8 +97,8 @@ export const ThemePresets = {
       divider: 'rgba(130, 190, 220, 0.2)',
       pageBackgroundColor: '#041522',
       pageGradient: ['#02111c', '#041522', '#082032'],
-      pageGlowPrimary: 'rgba(59, 210, 255, 0.2)',
-      pageGlowSecondary: 'rgba(144, 202, 249, 0.16)',
+      pageGlowPrimary: 'rgba(59, 210, 255, 0.07)',
+      pageGlowSecondary: 'rgba(144, 202, 249, 0.06)',
       cardBorder: 'rgba(130, 190, 220, 0.16)',
       headerSurface: 'rgba(4, 24, 36, 0.82)',
       heroSurface: 'rgba(10, 30, 45, 0.76)',
@@ -123,8 +123,8 @@ export const ThemePresets = {
       divider: 'rgba(38, 67, 50, 0.16)',
       pageBackgroundColor: '#eef4ec',
       pageGradient: ['#f4f8f1', '#eef4ec', '#e8f0e1'],
-      pageGlowPrimary: 'rgba(47, 107, 79, 0.16)',
-      pageGlowSecondary: 'rgba(183, 137, 79, 0.16)',
+      pageGlowPrimary: 'rgba(47, 107, 79, 0.06)',
+      pageGlowSecondary: 'rgba(183, 137, 79, 0.06)',
       cardBorder: 'rgba(38, 67, 50, 0.12)',
       headerSurface: 'rgba(255,255,255,0.74)',
       heroSurface: 'rgba(255,255,255,0.68)',
@@ -149,8 +149,8 @@ export const ThemePresets = {
       divider: 'rgba(184, 77, 20, 0.2)',
       pageBackgroundColor: '#fff2dd',
       pageGradient: ['#fff7e9', '#ffedd2', '#ffe4c3'],
-      pageGlowPrimary: 'rgba(242, 154, 98, 0.24)',
-      pageGlowSecondary: 'rgba(15, 139, 141, 0.18)',
+      pageGlowPrimary: 'rgba(242, 154, 98, 0.08)',
+      pageGlowSecondary: 'rgba(15, 139, 141, 0.06)',
       cardBorder: 'rgba(184, 77, 20, 0.12)',
       headerSurface: 'rgba(255,255,255,0.76)',
       heroSurface: 'rgba(255,255,255,0.7)',
@@ -175,8 +175,8 @@ export const ThemePresets = {
       divider: 'rgba(192, 77, 122, 0.18)',
       pageBackgroundColor: '#fff5f8',
       pageGradient: ['#fff9fb', '#fff4f7', '#fdf0f6'],
-      pageGlowPrimary: 'rgba(223, 139, 176, 0.24)',
-      pageGlowSecondary: 'rgba(95, 136, 179, 0.18)',
+      pageGlowPrimary: 'rgba(223, 139, 176, 0.08)',
+      pageGlowSecondary: 'rgba(95, 136, 179, 0.06)',
       cardBorder: 'rgba(192, 77, 122, 0.12)',
       headerSurface: 'rgba(255,255,255,0.78)',
       heroSurface: 'rgba(255,255,255,0.72)',
@@ -201,8 +201,8 @@ export const ThemePresets = {
       divider: 'rgba(126, 149, 255, 0.18)',
       pageBackgroundColor: '#050816',
       pageGradient: ['#040611', '#050816', '#0b1030'],
-      pageGlowPrimary: 'rgba(95, 242, 255, 0.22)',
-      pageGlowSecondary: 'rgba(255, 79, 216, 0.18)',
+      pageGlowPrimary: 'rgba(95, 242, 255, 0.07)',
+      pageGlowSecondary: 'rgba(255, 79, 216, 0.06)',
       cardBorder: 'rgba(116, 137, 255, 0.18)',
       headerSurface: 'rgba(5, 10, 24, 0.84)',
       heroSurface: 'rgba(11, 16, 48, 0.76)',
@@ -219,6 +219,7 @@ export const Colors = Object.fromEntries(
 ) as Record<ThemePresetKey, ThemePalette>;
 
 export type ThemeColor = keyof ThemePalette;
+export type ThemeTextColor = Exclude<ThemeColor, 'pageGradient'>;
 
 export const Brand = {
   primary: '#0f766e',
@@ -248,14 +249,25 @@ export const Fonts = Platform.select({
   },
 });
 
+export const Typography = {
+  hero: { fontSize: 32, lineHeight: 38, fontWeight: '700' as const },
+  section: { fontSize: 22, lineHeight: 28, fontWeight: '600' as const },
+  cardTitle: { fontSize: 17, lineHeight: 22, fontWeight: '600' as const },
+  body: { fontSize: 15, lineHeight: 20, fontWeight: '500' as const },
+  caption: { fontSize: 13, lineHeight: 18, fontWeight: '500' as const },
+  captionBold: { fontSize: 13, lineHeight: 18, fontWeight: '700' as const },
+  small: { fontSize: 12, lineHeight: 16, fontWeight: '500' as const },
+  smallBold: { fontSize: 12, lineHeight: 16, fontWeight: '700' as const },
+} as const;
+
 export const Spacing = {
   half: 2,
   one: 4,
   two: 8,
-  three: 16,
-  four: 24,
-  five: 32,
-  six: 64,
+  three: 12,
+  four: 16,
+  five: 24,
+  six: 32,
 } as const;
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 72, web: 74 }) ?? 0;

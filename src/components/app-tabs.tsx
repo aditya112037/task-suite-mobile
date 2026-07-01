@@ -13,10 +13,10 @@ export default function AppTabs() {
       indicatorColor={colors.primary}
       labelStyle={{
         selected: { color: colors.text, fontWeight: '700' },
-        style: { color: colors.textSecondary },
+        default: { color: colors.textSecondary },
       }}>
       <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Label>Overview</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           src={require('@/assets/images/tabIcons/home.png')}
           renderingMode="template"
@@ -24,7 +24,7 @@ export default function AppTabs() {
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="remote-work">
-        <NativeTabs.Trigger.Label>My Tasks</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>Tasks</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           src={require('@/assets/images/tabIcons/explore.png')}
           renderingMode="template"

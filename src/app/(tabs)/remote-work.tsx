@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GlassView } from "expo-glass-effect";
-import { SymbolView } from "expo-symbols";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput } from "react-native";
+import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput, View } from "react-native";
 
 import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
@@ -15,22 +14,20 @@ const FILTERS = ["all", "todo", "in-progress", "completed"] as const;
 type FilterKey = (typeof FILTERS)[number];
 
 function formatDueLabel(value: string | null) {
-  if (!value) return "No due date";
+  if (!value) return "";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "No due date";
+  if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function getTaskUrgency(task: PersonalTask) {
-  if (!task.dueDate || task.status === "completed") return "steady";
-
+  if (!task.dueDate || task.status === "completed") return null;
   const dueDate = new Date(task.dueDate);
-  if (Number.isNaN(dueDate.getTime())) return "steady";
-
+  if (Number.isNaN(dueDate.getTime())) return null;
   const diffMs = dueDate.getTime() - Date.now();
   if (diffMs < 0) return "overdue";
   if (diffMs <= 1000 * 60 * 60 * 24 * 2) return "soon";
-  return "steady";
+  return null;
 }
 
 export default function MyTasksScreen() {
@@ -46,12 +43,13 @@ export default function MyTasksScreen() {
 
   const visibleTasks = useMemo(() => {
     const filtered = filter === "all" ? tasks : tasks.filter((task) => task.status === filter);
-
     return [...filtered].sort((left, right) => {
-      const urgencyOrder = { overdue: 0, soon: 1, steady: 2 };
-      const urgencyGap = urgencyOrder[getTaskUrgency(left)] - urgencyOrder[getTaskUrgency(right)];
-      if (urgencyGap !== 0) return urgencyGap;
-
+      const urgencyOrder = { overdue: 0, soon: 1 };
+      const lu = getTaskUrgency(left);
+      const ru = getTaskUrgency(right);
+      const lg = lu ? urgencyOrder[lu] : 2;
+      const rg = ru ? urgencyOrder[ru] : 2;
+      if (lg !== rg) return lg - rg;
       const rightTime = right.updatedAt ? new Date(right.updatedAt).getTime() : 0;
       const leftTime = left.updatedAt ? new Date(left.updatedAt).getTime() : 0;
       return rightTime - leftTime;
@@ -61,10 +59,10 @@ export default function MyTasksScreen() {
   const taskStats = useMemo(
     () => ({
       total: tasks.length,
-      todo: tasks.filter((task) => task.status === "todo").length,
-      inProgress: tasks.filter((task) => task.status === "in-progress").length,
-      completed: tasks.filter((task) => task.status === "completed").length,
-      overdue: tasks.filter((task) => getTaskUrgency(task) === "overdue").length,
+      todo: tasks.filter((t) => t.status === "todo").length,
+      inProgress: tasks.filter((t) => t.status === "in-progress").length,
+      completed: tasks.filter((t) => t.status === "completed").length,
+      overdue: tasks.filter((t) => getTaskUrgency(t) === "overdue").length,
     }),
     [tasks]
   );
@@ -72,12 +70,8 @@ export default function MyTasksScreen() {
   const loadTasks = useCallback(
     async (isRefresh = false) => {
       try {
-        if (isRefresh) {
-          setRefreshing(true);
-        } else {
-          setLoading(true);
-        }
-
+        if (isRefresh) setRefreshing(true);
+        else setLoading(true);
         const nextTasks = await getTasks();
         setTasks(nextTasks);
         setError(null);
@@ -97,27 +91,16 @@ export default function MyTasksScreen() {
   );
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      void loadTasks();
-    }, 0);
-
+    const timer = setTimeout(() => void loadTasks(), 0);
     return () => clearTimeout(timer);
   }, [loadTasks]);
 
   async function handleCreateTask() {
     const trimmedTitle = title.trim();
-    if (!trimmedTitle) {
-      Alert.alert("Title needed", "Name the task before creating it.");
-      return;
-    }
-
+    if (!trimmedTitle) return;
     setSaving(true);
-
     try {
-      const createdTask = await createTask({
-        title: trimmedTitle,
-        workspace: "work",
-      });
+      const createdTask = await createTask({ title: trimmedTitle, workspace: "work" });
       setTasks((currentTasks) => [createdTask, ...currentTasks]);
       setTitle("");
       setError(null);
@@ -150,101 +133,60 @@ export default function MyTasksScreen() {
 
   return (
     <ScreenShell refreshing={refreshing} onRefresh={() => loadTasks(true)}>
-      <ThemedView style={styles.container}>
-        <ThemedView style={styles.header}>
-          <ThemedText type="subtitle" style={styles.headerTitle}>
-            My Tasks
-          </ThemedText>
-          <ThemedText themeColor="textSecondary">
-            Personal tasks synced directly with your Task Suite backend.
-          </ThemedText>
-        </ThemedView>
+      <View style={styles.container}>
+        <ThemedText type="hero">Today&apos;s Tasks</ThemedText>
 
-        <GlassView style={styles.heroCard}>
-          <ThemedView style={styles.heroCopy}>
-            <ThemedText type="smallBold" themeColor="textSecondary">
-              TODAY&apos;S PLAN
-            </ThemedText>
-            <ThemedText>
-              {taskStats.inProgress} moving now, {taskStats.todo} ready to start, and {taskStats.overdue} overdue.
-            </ThemedText>
-          </ThemedView>
-          <ThemedView style={styles.heroMetrics}>
-            <GlassView style={styles.heroMetricCard}>
-              <ThemedText type="small" themeColor="textSecondary">
-                Open
-              </ThemedText>
-              <ThemedText type="subtitle">{taskStats.todo + taskStats.inProgress}</ThemedText>
-            </GlassView>
-            <GlassView style={styles.heroMetricCard}>
-              <ThemedText type="small" themeColor="textSecondary">
-                Done
-              </ThemedText>
-              <ThemedText type="subtitle">{taskStats.completed}</ThemedText>
-            </GlassView>
-          </ThemedView>
-        </GlassView>
-
-        <GlassView style={styles.composerCard}>
-          <ThemedText type="smallBold" themeColor="textSecondary">
-            Quick Capture
-          </ThemedText>
+        <View style={styles.quickRow}>
           <TextInput
             value={title}
             onChangeText={setTitle}
-            placeholder="What needs to move today?"
+            placeholder="Quick capture..."
             placeholderTextColor={theme.textSecondary}
-            style={[
-              styles.input,
-              {
-                color: theme.text,
-                borderColor: theme.backgroundSelected,
-              },
-            ]}
+            onSubmitEditing={handleCreateTask}
+            style={[styles.quickInput, { color: theme.text, borderColor: theme.divider, backgroundColor: theme.backgroundElement }]}
           />
           <Pressable
             onPress={handleCreateTask}
-            disabled={saving}
-            style={({ pressed }) => [styles.createButton, { backgroundColor: theme.primary, opacity: pressed || saving ? 0.82 : 1 }]}>
-            {saving ? <ActivityIndicator color="#f5f1ea" /> : <ThemedText type="smallBold" style={styles.primaryText}>Create Task</ThemedText>}
+            disabled={saving || !title.trim()}
+            style={[styles.addButton, { backgroundColor: theme.primary, opacity: saving || !title.trim() ? 0.5 : 1 }]}>
+            {saving ? <ActivityIndicator color="#fff" size="small" /> : <ThemedText type="captionBold" style={styles.btnText}>Add</ThemedText>}
           </Pressable>
-        </GlassView>
+        </View>
 
-        <ThemedView style={styles.filterRow}>
+        <View style={styles.statRow}>
+          <ThemedText type="caption" themeColor="textSecondary">
+            {taskStats.todo + taskStats.inProgress} open
+            {taskStats.overdue > 0 ? `, ${taskStats.overdue} overdue` : ""}
+          </ThemedText>
+        </View>
+
+        <View style={styles.filterRow}>
           {FILTERS.map((item) => (
             <Pressable
               key={item}
               onPress={() => setFilter(item)}
-              style={({ pressed }) => [
-                styles.filterPill,
-                {
-                  opacity: pressed ? 0.85 : 1,
-                  backgroundColor: filter === item ? theme.backgroundSelected : theme.backgroundElement,
-                },
-              ]}>
-              <ThemedText type="smallBold" themeColor={filter === item ? "text" : "textSecondary"}>
-                {item === "in-progress" ? "In progress" : item === "todo" ? "To do" : item === "all" ? "All" : "Completed"}
+              style={[styles.filterPill, { backgroundColor: filter === item ? theme.backgroundSelected : theme.backgroundElement }]}>
+              <ThemedText type="captionBold" themeColor={filter === item ? "text" : "textSecondary"}>
+                {item === "in-progress" ? "In progress" : item === "todo" ? "To do" : item === "all" ? "All" : "Done"}
               </ThemedText>
             </Pressable>
           ))}
-        </ThemedView>
+        </View>
 
         {loading ? (
-          <ThemedView style={styles.loadingWrap}>
+          <View style={styles.loadingWrap}>
             <ActivityIndicator size="large" color={theme.textSecondary} />
-          </ThemedView>
+          </View>
         ) : null}
 
         {error ? (
           <GlassView style={styles.errorCard}>
-            <ThemedText type="smallBold">Couldn&apos;t load tasks</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              {error}
-            </ThemedText>
+            <ThemedText type="cardTitle">Couldn&apos;t load tasks</ThemedText>
+            <ThemedText type="caption" themeColor="textSecondary">{error}</ThemedText>
           </GlassView>
         ) : null}
 
-        <ThemedView style={styles.taskList}>
+        <View style={styles.taskList}>
           {visibleTasks.length ? (
             visibleTasks.map((task) => {
               const urgency = getTaskUrgency(task);
@@ -252,70 +194,49 @@ export default function MyTasksScreen() {
 
               return (
                 <GlassView key={task.id} style={styles.taskCard}>
-                  <ThemedView style={styles.taskTopRow}>
-                    <ThemedView style={styles.taskMeta}>
-                      <ThemedText>{task.title}</ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        {task.priority} priority - {task.status.replace("-", " ")}
-                      </ThemedText>
-                    </ThemedView>
-                    <SymbolView
-                      tintColor={task.status === "completed" ? "#34c759" : theme.textSecondary}
-                      name={{
-                        ios: task.status === "completed" ? "checkmark.circle.fill" : "circle.dashed",
-                        android: task.status === "completed" ? "check_circle" : "pending",
-                      }}
-                      size={22}
-                    />
-                  </ThemedView>
+                  <View style={styles.taskTop}>
+                    <ThemedText type="body" style={{ flex: 1 }}>{task.title}</ThemedText>
+                    <Pressable onPress={() => handleDelete(task)}>
+                      <ThemedText type="caption" themeColor="textSecondary">×</ThemedText>
+                    </Pressable>
+                  </View>
 
-                  <ThemedView style={styles.progressTrack}>
-                    <ThemedView style={[styles.progressFill, { width: `${Math.max(8, task.progressPercentage)}%`, backgroundColor: theme.primary }]} />
-                  </ThemedView>
-
-                  <ThemedView style={styles.taskMetaRow}>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {formatDueLabel(task.dueDate)} - {task.workspace} - {task.completedSubtasks}/{task.totalSubtasks} checklist items
+                  <View style={styles.taskMeta}>
+                    <ThemedText type="caption" style={{ color: urgencyColor }}>
+                      {urgency === "overdue" ? "Overdue" : urgency === "soon" ? "Due soon" : ""}
+                      {task.dueDate ? ` ${formatDueLabel(task.dueDate)}` : ""}
                     </ThemedText>
-                    <ThemedText type="smallBold" style={{ color: urgencyColor }}>
-                      {urgency === "overdue" ? "Overdue" : urgency === "soon" ? "Due soon" : `${task.progressPercentage}%`}
-                    </ThemedText>
-                  </ThemedView>
+                    <ThemedText type="caption" themeColor="textSecondary">{task.priority}</ThemedText>
+                  </View>
 
-                  <ThemedView style={styles.actionsRow}>
+                  <View style={[styles.progressTrack, { backgroundColor: theme.divider }]}>
+                    <View style={[styles.progressFill, { width: `${Math.max(4, task.progressPercentage)}%`, backgroundColor: theme.primary }]} />
+                  </View>
+
+                  <View style={styles.actionsRow}>
                     {task.status === "todo" ? (
-                      <Pressable onPress={() => handleProgress(task, "start")} style={styles.actionButton}>
-                        <ThemedText type="smallBold">Start</ThemedText>
+                      <Pressable onPress={() => handleProgress(task, "start")} style={styles.actionChip}>
+                        <ThemedText type="captionBold">Start</ThemedText>
                       </Pressable>
                     ) : null}
                     {task.status !== "completed" ? (
-                      <Pressable onPress={() => handleProgress(task, "complete")} style={[styles.actionButton, styles.primaryActionButton]}>
-                        <ThemedText type="smallBold" style={styles.primaryText}>
-                          Complete
-                        </ThemedText>
+                      <Pressable onPress={() => handleProgress(task, "complete")} style={[styles.actionChip, { backgroundColor: theme.primary }]}>
+                        <ThemedText type="captionBold" style={{ color: "#fff" }}>Complete</ThemedText>
                       </Pressable>
                     ) : null}
-                    <Pressable onPress={() => handleDelete(task)} style={styles.actionButton}>
-                      <ThemedText type="smallBold" themeColor="textSecondary">
-                        Delete
-                      </ThemedText>
-                    </Pressable>
-                  </ThemedView>
+                  </View>
                 </GlassView>
               );
             })
           ) : (
             <GlassView style={styles.emptyCard}>
-              <ThemedText>{tasks.length ? "Nothing in this filter." : "No personal tasks yet."}</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                {tasks.length
-                  ? "Switch the filter or create another task."
-                  : "Capture your first task above and it will sync immediately."}
+              <ThemedText type="body" themeColor="textSecondary">
+                {tasks.length ? "Nothing in this filter." : "No tasks yet. Capture one above."}
               </ThemedText>
             </GlassView>
           )}
-        </ThemedView>
-      </ThemedView>
+        </View>
+      </View>
     </ScreenShell>
   );
 }
@@ -324,72 +245,49 @@ const styles = StyleSheet.create({
   container: {
     gap: Spacing.three,
   },
-  header: {
-    gap: Spacing.one,
-  },
-  headerTitle: {
-    fontSize: 34,
-    lineHeight: 40,
-  },
-  heroCard: {
-    padding: Spacing.three,
-    borderRadius: 24,
-    gap: Spacing.three,
-  },
-  heroCopy: {
-    gap: 6,
-    backgroundColor: "transparent",
-  },
-  heroMetrics: {
+  quickRow: {
     flexDirection: "row",
     gap: Spacing.two,
-    backgroundColor: "transparent",
+    alignItems: "center",
   },
-  heroMetricCard: {
+  quickInput: {
     flex: 1,
-    padding: Spacing.three,
-    borderRadius: 20,
-    gap: 4,
-  },
-  composerCard: {
-    padding: Spacing.four,
-    borderRadius: 24,
-    gap: Spacing.three,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 14,
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
-    fontSize: 16,
+    paddingVertical: Spacing.two,
+    fontSize: 15,
   },
-  createButton: {
-    alignSelf: "flex-start",
+  addButton: {
+    borderRadius: 12,
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.two,
-    borderRadius: 999,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  primaryText: {
-    color: "#f5f1ea",
+  btnText: {
+    color: "#fff",
+  },
+  statRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   filterRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.two,
+    gap: Spacing.one,
   },
   filterPill: {
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    paddingVertical: Spacing.one,
     borderRadius: 999,
   },
   loadingWrap: {
     paddingVertical: Spacing.five,
+    alignItems: "center",
   },
   errorCard: {
     padding: Spacing.three,
-    borderRadius: 20,
+    borderRadius: 16,
     gap: Spacing.one,
   },
   taskList: {
@@ -397,50 +295,41 @@ const styles = StyleSheet.create({
   },
   taskCard: {
     padding: Spacing.three,
-    borderRadius: 22,
-    gap: Spacing.two,
+    borderRadius: 14,
+    gap: Spacing.one,
   },
-  taskTopRow: {
+  taskTop: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.two,
   },
   taskMeta: {
-    flex: 1,
-    gap: 4,
+    flexDirection: "row",
+    gap: Spacing.two,
+    alignItems: "center",
   },
   progressTrack: {
-    height: 8,
+    height: 3,
     borderRadius: 999,
     overflow: "hidden",
-    backgroundColor: "rgba(255,255,255,0.08)",
   },
   progressFill: {
     height: "100%",
     borderRadius: 999,
   },
-  taskMetaRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: Spacing.two,
-    alignItems: "center",
-  },
   actionsRow: {
     flexDirection: "row",
-    gap: Spacing.two,
-    flexWrap: "wrap",
+    gap: Spacing.one,
+    paddingTop: 2,
   },
-  actionButton: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+  actionChip: {
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 4,
     borderRadius: 999,
-  },
-  primaryActionButton: {
-    backgroundColor: Brand.primary,
   },
   emptyCard: {
     padding: Spacing.four,
-    borderRadius: 22,
+    borderRadius: 16,
     gap: Spacing.one,
   },
 });

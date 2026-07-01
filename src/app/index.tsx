@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
 import { SymbolView } from "expo-symbols";
@@ -33,6 +33,7 @@ export default function HomePage() {
   const isTiny = height < 690 || width < 360;
   const promptLimit = isTiny ? 3 : isShort ? 4 : isCompact ? 6 : 8;
 
+  const redirectedRef = useRef(false);
   const isLoggedIn = hasToken === true;
   const prompts = useMemo(
     () => getIntentPrompts({ signedIn: isLoggedIn, hasTeamAccess: false, hasAdminTeamAccess: false }),
@@ -43,8 +44,15 @@ export default function HomePage() {
   const hiddenPromptCount = Math.max(prompts.length - visiblePrompts.length, 0);
 
   useEffect(() => {
-    if (hasToken === true) {
+    if (hasToken === true && !redirectedRef.current) {
+      redirectedRef.current = true;
       router.replace("/(tabs)");
+    }
+  }, [hasToken, router]);
+
+  useEffect(() => {
+    if (hasToken === false || hasToken === null) {
+      redirectedRef.current = false;
     }
   }, [hasToken]);
 

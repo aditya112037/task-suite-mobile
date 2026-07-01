@@ -1,6 +1,6 @@
 import { GlassView } from "expo-glass-effect";
 import { ReactNode } from "react";
-import { StyleProp, StyleSheet, ViewStyle } from "react-native";
+import { StyleProp, ViewStyle } from "react-native";
 
 import { Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
@@ -21,39 +21,33 @@ export function AppCard({ children, style, variant = "panel", borderColor }: App
     variant === "hero"
       ? {
           backgroundColor: theme.heroSurface,
-          borderRadius: 28,
+          borderRadius: 20,
           padding: Spacing.four,
         }
       : variant === "soft"
         ? {
             backgroundColor: theme.backgroundElement,
-            borderRadius: 20,
+            borderRadius: 16,
             padding: Spacing.three,
           }
         : {
             backgroundColor: theme.backgroundElement,
-            borderRadius: 22,
+            borderRadius: 16,
             padding: Spacing.three,
           };
 
   return (
     <GlassView
       style={[
-        styles.base,
-        variantStyle,
         {
+          borderWidth: 1,
+          gap: Spacing.two,
           borderColor: borderColor || theme.cardBorder,
         },
+        variantStyle,
         style,
       ]}>
       {children}
     </GlassView>
   );
 }
-
-const styles = StyleSheet.create({
-  base: {
-    borderWidth: 1,
-    gap: Spacing.two,
-  },
-});

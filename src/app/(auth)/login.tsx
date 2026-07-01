@@ -21,14 +21,12 @@ import { useTheme } from "@/hooks/use-theme";
 import { login, register } from "@/services/auth";
 import { signInWithGoogle } from "@/services/googleAuth";
 import { useAuth } from "@/services/auth-context";
-import { useThemePreset } from "@/services/theme-context";
 
 export default function LoginScreen() {
   const router = useRouter();
   const { checkToken } = useAuth();
   const safeAreaInsets = useSafeAreaInsets();
   const theme = useTheme();
-  const { activeThemeKey, availableThemes, setThemePreset } = useThemePreset();
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -127,10 +125,10 @@ export default function LoginScreen() {
             <ThemedText style={[styles.eyebrow, { color: theme.secondary }]}>
               TASK SUITE
             </ThemedText>
-            <ThemedText style={[styles.title, { color: theme.primary }]}>
+            <ThemedText type="hero" themeColor="primary" style={{ textAlign: "center" }}>
               {isRegister ? "Create Account" : "Welcome Back"}
             </ThemedText>
-            <ThemedText style={[styles.subtitle, { color: theme.textSecondary }]}>
+            <ThemedText type="body" themeColor="textSecondary" style={{ textAlign: "center", maxWidth: 420 }}>
               {isRegister
                 ? "Build your workspace with the same Task Suite flow as the web app."
                 : "Sign in to continue with your teams, tasks, reports, and mobile workspace."}
@@ -262,34 +260,6 @@ export default function LoginScreen() {
               </Pressable>
             </GlassView>
 
-            <View style={styles.themeWrap}>
-              <ThemedText style={[styles.themeLabel, { color: theme.textSecondary }]}>Theme</ThemedText>
-              <View style={styles.themeRow}>
-                {availableThemes.map((themeOption) => {
-                  const selected = themeOption.key === activeThemeKey;
-
-                  return (
-                    <Pressable
-                      key={themeOption.key}
-                      onPress={() => setThemePreset(themeOption.key)}
-                      style={[
-                        styles.themeChip,
-                        {
-                          backgroundColor: selected ? theme.backgroundSelected : theme.backgroundElement,
-                          borderColor: selected ? theme.primary : theme.cardBorder,
-                        },
-                      ]}>
-                      <ThemedText
-                        type="smallBold"
-                        style={{ color: selected ? theme.primary : theme.textSecondary }}>
-                        {themeOption.label}
-                      </ThemedText>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-
             <View style={styles.footer}>
               <ThemedText style={[styles.footerText, { color: theme.textSecondary }]}>
                 {isRegister ? "Already have an account?" : "New here?"}
@@ -322,29 +292,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: Spacing.four,
   },
-  title: {
-    fontSize: 34,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
   eyebrow: {
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 2.2,
     marginBottom: Spacing.one,
   },
-  subtitle: {
-    fontSize: 15,
-    lineHeight: 22,
-    textAlign: "center",
-    marginTop: Spacing.one,
-    marginBottom: Spacing.four,
-    maxWidth: 420,
-  },
   card: {
     width: "100%",
     maxWidth: 400,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
     padding: Spacing.four,
     gap: Spacing.three,
@@ -355,8 +312,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 12,
     borderWidth: 1,
-    borderRadius: 14,
-    paddingVertical: 14,
+    borderRadius: 12,
+    paddingVertical: 12,
   },
   googleIconContainer: {
     width: 20,
@@ -380,8 +337,7 @@ const styles = StyleSheet.create({
     color: "#4285F4",
   },
   googleLabel: {
-    fontSize: 16,
-    color: "#f4f1ff",
+    fontSize: 15,
     fontWeight: "500",
   },
   divider: {
@@ -402,28 +358,28 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   label: {
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: 13,
+    fontWeight: "600",
     marginLeft: 2,
   },
   input: {
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: Platform.OS === "ios" ? 14 : 12,
-    fontSize: 16,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === "ios" ? 12 : 10,
+    fontSize: 15,
   },
   submitButton: {
-    borderRadius: 14,
-    paddingVertical: 14,
+    borderRadius: 12,
+    paddingVertical: 12,
     alignItems: "center",
     justifyContent: "center",
     marginTop: Spacing.one,
-    minHeight: 48,
+    minHeight: 44,
   },
   submitText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
   },
   footer: {
@@ -432,39 +388,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexWrap: "wrap",
     gap: 6,
-    paddingTop: Spacing.four,
-    paddingBottom: Spacing.five,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.six,
   },
   footerText: {
     fontSize: 14,
-    color: "rgba(244, 241, 255, 0.6)",
   },
   footerLink: {
     fontSize: 14,
     fontWeight: "700",
-  },
-  themeWrap: {
-    width: "100%",
-    maxWidth: 460,
-    gap: Spacing.two,
-    marginTop: Spacing.three,
-  },
-  themeLabel: {
-    fontSize: 13,
-    fontWeight: "700",
-    textAlign: "center",
-    letterSpacing: 1,
-  },
-  themeRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: Spacing.two,
-  },
-  themeChip: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: 999,
-    borderWidth: 1,
   },
 });

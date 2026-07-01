@@ -2,7 +2,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
 
 import { Colors, DEFAULT_THEME_PRESET, ThemePresetKey, ThemePresets, type ThemePalette } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
 
 const STORAGE_KEY = "task-suite-theme-preset";
 
@@ -16,7 +15,6 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const colorScheme = useColorScheme();
   const [themeKey, setThemeKey] = useState<ThemePresetKey | null>(null);
 
   useEffect(() => {
@@ -31,7 +29,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      setThemeKey(colorScheme === "dark" ? "dark" : DEFAULT_THEME_PRESET);
+      setThemeKey(DEFAULT_THEME_PRESET);
     };
 
     void hydrate();
@@ -39,10 +37,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [colorScheme]);
+  }, []);
 
   const value = useMemo<ThemeContextValue>(() => {
-    const activeThemeKey = themeKey || (colorScheme === "dark" ? "dark" : DEFAULT_THEME_PRESET);
+    const activeThemeKey = themeKey || DEFAULT_THEME_PRESET;
 
     return {
       activeThemeKey,
@@ -56,7 +54,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         await AsyncStorage.setItem(STORAGE_KEY, nextKey);
       },
     };
-  }, [colorScheme, themeKey]);
+  }, [themeKey]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

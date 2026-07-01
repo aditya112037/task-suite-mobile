@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { GlassView } from "expo-glass-effect";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput } from "react-native";
+import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput, View } from "react-native";
 
 import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
@@ -26,12 +26,8 @@ const COLOR_OPTIONS = ["#3c87f7", "#f97316", "#10b981", "#e11d48"];
 function extractInviteCode(value: string) {
   const normalized = value.trim();
   if (!normalized) return "";
-
   const joinIndex = normalized.lastIndexOf("/join/");
-  if (joinIndex >= 0) {
-    return normalized.slice(joinIndex + "/join/".length).split(/[?#]/)[0].trim();
-  }
-
+  if (joinIndex >= 0) return normalized.slice(joinIndex + "/join/".length).split(/[?#]/)[0].trim();
   return normalized.replace(/^\/+|\/+$/g, "");
 }
 
@@ -53,24 +49,11 @@ export default function TeamsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const teamStats = useMemo(
-    () => ({
-      total: teams.length,
-      admin: teams.filter((team) => team.isAdmin).length,
-      pending: teams.reduce((sum, team) => sum + team.pendingJoinRequestCount, 0),
-      members: teams.reduce((sum, team) => sum + team.memberCount, 0),
-    }),
-    [teams]
-  );
-
   const loadTeams = useCallback(
     async (isRefresh = false) => {
       try {
-        if (isRefresh) {
-          setRefreshing(true);
-        } else {
-          setLoading(true);
-        }
+        if (isRefresh) setRefreshing(true);
+        else setLoading(true);
 
         const profile = await getProfile();
         const [nextTeams, joinRequests] = await Promise.all([getTeams(profile.id), getMyJoinRequests().catch(() => ({ pending: [], rejected: [] }))]);
@@ -81,7 +64,6 @@ export default function TeamsScreen() {
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to load teams";
         setError(message);
-
         if (message.toLowerCase().includes("session") || message.toLowerCase().includes("authorized")) {
           await signOut();
           Alert.alert("Session expired", "Please sign in again.");
@@ -95,431 +77,195 @@ export default function TeamsScreen() {
   );
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      void loadTeams();
-    }, 0);
-
+    const timer = setTimeout(() => void loadTeams(), 0);
     return () => clearTimeout(timer);
   }, [loadTeams]);
 
-  useEffect(() => {
-    if (action === "join") {
-      setTimeout(() => {
-        setError("Paste an invite link below and request access.");
-      }, 0);
-    }
-  }, [action]);
-
   async function handleCreateTeam() {
     const name = teamName.trim();
-
-    if (!name) {
-      Alert.alert("Team name required", "Give the new workspace a name first.");
-      return;
-    }
-
+    if (!name) { Alert.alert("Team name required", "Give the new workspace a name first."); return; }
     setCreating(true);
-
     try {
-      await createTeam({
-        name,
-        description: teamDescription.trim(),
-        color: selectedColor,
-        icon: "Workspace",
-      });
-      setTeamName("");
-      setTeamDescription("");
+      await createTeam({ name, description: teamDescription.trim(), color: selectedColor, icon: "Workspace" });
+      setTeamName(""); setTeamDescription("");
       await loadTeams();
-      Alert.alert("Workspace created", "Your team is ready.");
     } catch (err) {
       Alert.alert("Could not create team", err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setCreating(false);
-    }
+    } finally { setCreating(false); }
   }
 
   async function handleJoinTeam() {
     const code = extractInviteCode(inviteCode);
-
-    if (!code) {
-      Alert.alert("Invite code required", "Paste a team invite link or the team code.");
-      return;
-    }
-
+    if (!code) { Alert.alert("Invite code required", "Paste a team invite link or the team code."); return; }
     setJoining(true);
-
     try {
       const result = await joinTeam(code);
       setInviteCode("");
       await loadTeams();
-      Alert.alert("Invite sent", result.message || "Your join request has been sent.");
     } catch (err) {
       Alert.alert("Could not join team", err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setJoining(false);
-    }
-  }
-
-  async function handleRetractRequest(teamId: string) {
-    try {
-      setRequestBusyId(teamId);
-      await retractJoinRequest(teamId);
-      await loadTeams(true);
-    } catch (err) {
-      Alert.alert("Could not retract request", err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setRequestBusyId("");
-    }
-  }
-
-  async function handleClearRejected(notificationId: string) {
-    try {
-      setRequestBusyId(notificationId);
-      await clearRejectedJoinRequest(notificationId);
-      await loadTeams(true);
-    } catch (err) {
-      Alert.alert("Could not clear request", err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setRequestBusyId("");
-    }
+    } finally { setJoining(false); }
   }
 
   return (
     <ScreenShell refreshing={refreshing} onRefresh={() => loadTeams(true)}>
-      <ThemedView style={styles.container}>
-        <GlassView style={styles.heroCard}>
-          <ThemedView style={styles.heroCopy}>
-            <ThemedText type="smallBold" themeColor="textSecondary">
-              TEAM WORKSPACES
-            </ThemedText>
-            <ThemedText type="subtitle" style={styles.headerTitle}>
-              Teams
-            </ThemedText>
-            <ThemedText themeColor="textSecondary">
-              Shared workspaces, member roles, attendance, team tasks, extensions, and conference entry points.
-            </ThemedText>
-          </ThemedView>
+      <View style={styles.header}>
+        <ThemedText type="hero">Teams</ThemedText>
+        <ThemedText type="caption" themeColor="textSecondary">{teams.length} workspace{teams.length !== 1 ? "s" : ""}</ThemedText>
+      </View>
 
-          <ThemedView style={styles.heroStats}>
-            <GlassView style={styles.heroStatCard}>
-              <ThemedText type="small" themeColor="textSecondary">
-                Workspaces
-              </ThemedText>
-              <ThemedText type="subtitle">{teamStats.total}</ThemedText>
-            </GlassView>
-            <GlassView style={styles.heroStatCard}>
-              <ThemedText type="small" themeColor="textSecondary">
-                Requests
-              </ThemedText>
-              <ThemedText type="subtitle">{pendingRequests.length + rejectedRequests.length}</ThemedText>
-            </GlassView>
-          </ThemedView>
-        </GlassView>
+      <View style={styles.createRow}>
+        <Pressable
+          onPress={() => router.push({ pathname: "/teams", params: { action: "create" } })}
+          style={[styles.createChip, { backgroundColor: theme.backgroundElement, borderColor: theme.cardBorder, borderWidth: 1 }]}>
+          <ThemedText type="captionBold">+ Create</ThemedText>
+        </Pressable>
+        <Pressable
+          onPress={() => router.push({ pathname: "/teams", params: { action: "join" } })}
+          style={[styles.createChip, { backgroundColor: theme.backgroundElement, borderColor: theme.cardBorder, borderWidth: 1 }]}>
+          <ThemedText type="captionBold">Join</ThemedText>
+        </Pressable>
+      </View>
 
-        <ThemedView style={styles.metricGrid}>
-          <GlassView style={styles.metricCard}>
-            <ThemedText type="small" themeColor="textSecondary">
-              Admin spaces
-            </ThemedText>
-            <ThemedText type="subtitle">{teamStats.admin}</ThemedText>
-          </GlassView>
-          <GlassView style={styles.metricCard}>
-            <ThemedText type="small" themeColor="textSecondary">
-              Members total
-            </ThemedText>
-            <ThemedText type="subtitle">{teamStats.members}</ThemedText>
-          </GlassView>
-        </ThemedView>
-
-        <GlassView style={[styles.createCard, action === "create" ? styles.focusCard : null]}>
-          <ThemedText type="smallBold" themeColor="textSecondary">
-            Create workspace
-          </ThemedText>
-          <TextInput
-            value={teamName}
-            onChangeText={setTeamName}
-            placeholder="Team name"
-            placeholderTextColor={theme.textSecondary}
-            style={[styles.input, { color: theme.text, borderColor: theme.backgroundSelected }]}
-          />
-          <TextInput
-            value={teamDescription}
-            onChangeText={setTeamDescription}
-            placeholder="Short description"
-            placeholderTextColor={theme.textSecondary}
-            style={[styles.input, { color: theme.text, borderColor: theme.backgroundSelected }]}
-          />
-          <ThemedView style={styles.colorRow}>
-            {COLOR_OPTIONS.map((color) => (
-              <Pressable
-                key={color}
-                onPress={() => setSelectedColor(color)}
-                style={[
-                  styles.colorDot,
-                  {
-                    backgroundColor: color,
-                    borderColor: selectedColor === color ? theme.text : "transparent",
-                  },
-                ]}
-              />
-            ))}
-          </ThemedView>
-          <Pressable onPress={handleCreateTeam} disabled={creating} style={[styles.primaryButton, { backgroundColor: theme.primary }]}>
-            {creating ? <ActivityIndicator color="#f5f1ea" /> : <ThemedText type="smallBold" style={styles.primaryButtonText}>Create Team</ThemedText>}
-          </Pressable>
-        </GlassView>
-
-        <GlassView style={[styles.createCard, action === "join" ? styles.focusCard : null]}>
-          <ThemedText type="smallBold" themeColor="textSecondary">
-            Join workspace
-          </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            Paste the invite link from Task Suite web, or just the team id at the end of it.
-          </ThemedText>
-          <TextInput
-            value={inviteCode}
-            onChangeText={setInviteCode}
-            placeholder="https://tasksuite.co/join/TEAM_ID"
-            placeholderTextColor={theme.textSecondary}
-            autoCapitalize="none"
-            style={[styles.input, { color: theme.text, borderColor: theme.backgroundSelected }]}
-          />
-          <Pressable onPress={handleJoinTeam} disabled={joining} style={[styles.primaryButton, { backgroundColor: Brand.secondary }]}>
-            {joining ? <ActivityIndicator color="#f5f1ea" /> : <ThemedText type="smallBold" style={styles.primaryButtonText}>Request to Join</ThemedText>}
-          </Pressable>
-        </GlassView>
-
-        {pendingRequests.length || rejectedRequests.length ? (
-          <GlassView style={styles.requestCard}>
-            <ThemedText type="smallBold" themeColor="textSecondary">
-              My Requests
-            </ThemedText>
-
-            {pendingRequests.map((request) => (
-              <ThemedView key={`pending-${request.teamId}`} style={styles.requestItem}>
-                <ThemedView style={[styles.requestAccent, { backgroundColor: request.teamColor || theme.primary }]} />
-                <ThemedView style={styles.requestCopy}>
-                  <ThemedText>{request.teamName}</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Waiting for approval
-                  </ThemedText>
-                </ThemedView>
-                <Pressable onPress={() => handleRetractRequest(request.teamId)} disabled={Boolean(requestBusyId)} style={styles.requestButton}>
-                  <ThemedText type="smallBold">{requestBusyId === request.teamId ? "Working..." : "Retract"}</ThemedText>
-                </Pressable>
-              </ThemedView>
-            ))}
-
-            {rejectedRequests.map((request) => (
-              <ThemedView key={`rejected-${request.notificationId || request.teamId}`} style={styles.requestItem}>
-                <ThemedView style={[styles.requestAccent, { backgroundColor: Brand.warning }]} />
-                <ThemedView style={styles.requestCopy}>
-                  <ThemedText>{request.teamName}</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {request.message || "Your join request was rejected."}
-                  </ThemedText>
-                </ThemedView>
-                <Pressable
-                  onPress={() => request.notificationId && handleClearRejected(request.notificationId)}
-                  disabled={Boolean(requestBusyId)}
-                  style={styles.requestButton}>
-                  <ThemedText type="smallBold">
-                    {requestBusyId === request.notificationId ? "Working..." : "Clear"}
-                  </ThemedText>
-                </Pressable>
-              </ThemedView>
-            ))}
-          </GlassView>
-        ) : null}
-
-        {loading ? (
-          <ThemedView style={styles.loadingWrap}>
-            <ActivityIndicator size="large" color={theme.textSecondary} />
-          </ThemedView>
-        ) : null}
-
-        {error ? (
-          <GlassView style={styles.errorCard}>
-            <ThemedText type="smallBold">Couldn&apos;t load teams</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              {error}
-            </ThemedText>
-          </GlassView>
-        ) : null}
-
-        <ThemedView style={styles.teamList}>
-          {teams.length ? (
-            teams.map((team) => (
-              <GlassView key={team.id} style={styles.teamCard}>
-                <Pressable
-                  onPress={() =>
-                    router.push({
-                      pathname: "/team/[teamId]",
-                      params: { teamId: team.id, section: "overview" },
-                    })
-                  }>
-                  <ThemedView style={styles.teamHeader}>
-                    <ThemedView style={[styles.colorBadge, { backgroundColor: team.color }]} />
-                    <ThemedView style={styles.teamCopy}>
-                      <ThemedText>{team.name}</ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        {team.memberCount} members - {team.myRole}
-                      </ThemedText>
-                    </ThemedView>
-                    <ThemedView
-                      style={[
-                        styles.rolePill,
-                        {
-                          backgroundColor: team.pendingJoinRequestCount ? "rgba(247, 168, 60, 0.16)" : theme.backgroundSelected,
-                        },
-                      ]}>
-                      <ThemedText type="smallBold">
-                        {team.pendingJoinRequestCount ? `${team.pendingJoinRequestCount} pending` : team.isAdmin ? "Admin" : "Member"}
-                      </ThemedText>
-                    </ThemedView>
-                  </ThemedView>
-                </Pressable>
-
-                <ThemedText type="small" themeColor="textSecondary">
-                  {team.description || "No description yet."}
-                </ThemedText>
-
-                <ThemedView style={styles.quickActionRow}>
-                  <Pressable onPress={() => router.push({ pathname: "/team/[teamId]", params: { teamId: team.id, section: "tasks" } })} style={styles.quickActionChip}>
-                    <ThemedText type="smallBold">Tasks</ThemedText>
-                  </Pressable>
-                  <Pressable onPress={() => router.push({ pathname: "/team/[teamId]", params: { teamId: team.id, section: "members" } })} style={styles.quickActionChip}>
-                    <ThemedText type="smallBold">Members</ThemedText>
-                  </Pressable>
-                  <Pressable onPress={() => router.push({ pathname: "/team/[teamId]", params: { teamId: team.id, section: "conference" } })} style={styles.quickActionChip}>
-                    <ThemedText type="smallBold">Conference</ThemedText>
-                  </Pressable>
-                  {(team.isAdmin || team.myRole === "manager") ? (
-                    <Pressable onPress={() => router.push({ pathname: "/team/[teamId]", params: { teamId: team.id, section: "extensions" } })} style={styles.quickActionChip}>
-                      <ThemedText type="smallBold">Extensions</ThemedText>
-                    </Pressable>
-                  ) : null}
-                </ThemedView>
-              </GlassView>
-            ))
+      {action === "create" || action === "join" ? (
+        <GlassView style={styles.formCard}>
+          <ThemedText type="cardTitle">{action === "create" ? "Create workspace" : "Join workspace"}</ThemedText>
+          {action === "create" ? (
+            <>
+              <TextInput value={teamName} onChangeText={setTeamName} placeholder="Team name" placeholderTextColor={theme.textSecondary}
+                style={[styles.input, { color: theme.text, borderColor: theme.divider, backgroundColor: theme.backgroundElement }]} />
+              <TextInput value={teamDescription} onChangeText={setTeamDescription} placeholder="Description (optional)" placeholderTextColor={theme.textSecondary}
+                style={[styles.input, { color: theme.text, borderColor: theme.divider, backgroundColor: theme.backgroundElement }]} />
+              <View style={styles.colorRow}>
+                {COLOR_OPTIONS.map((color) => (
+                  <Pressable key={color} onPress={() => setSelectedColor(color)}
+                    style={[styles.colorDot, { backgroundColor: color, borderColor: selectedColor === color ? theme.text : "transparent" }]} />
+                ))}
+              </View>
+              <Pressable onPress={handleCreateTeam} disabled={creating}
+                style={[styles.submitButton, { backgroundColor: theme.primary, opacity: creating ? 0.5 : 1 }]}>
+                {creating ? <ActivityIndicator color="#fff" /> : <ThemedText type="captionBold" style={{ color: "#fff" }}>Create</ThemedText>}
+              </Pressable>
+            </>
           ) : (
-            <GlassView style={styles.emptyCard}>
-              <ThemedText>No team workspaces yet.</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                Create one above to start shared task execution from the app.
-              </ThemedText>
-            </GlassView>
+            <>
+              <TextInput value={inviteCode} onChangeText={setInviteCode} placeholder="Paste invite link or code" placeholderTextColor={theme.textSecondary}
+                autoCapitalize="none"
+                style={[styles.input, { color: theme.text, borderColor: theme.divider, backgroundColor: theme.backgroundElement }]} />
+              <Pressable onPress={handleJoinTeam} disabled={joining}
+                style={[styles.submitButton, { backgroundColor: Brand.secondary, opacity: joining ? 0.5 : 1 }]}>
+                {joining ? <ActivityIndicator color="#fff" /> : <ThemedText type="captionBold" style={{ color: "#fff" }}>Join</ThemedText>}
+              </Pressable>
+            </>
           )}
-        </ThemedView>
-      </ThemedView>
+        </GlassView>
+      ) : null}
+
+      {loading ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={theme.textSecondary} />
+        </View>
+      ) : null}
+
+      {error ? (
+        <GlassView style={styles.errorCard}>
+          <ThemedText type="cardTitle">Couldn&apos;t load teams</ThemedText>
+          <ThemedText type="caption" themeColor="textSecondary">{error}</ThemedText>
+        </GlassView>
+      ) : null}
+
+      {!loading && teams.length === 0 ? (
+        <GlassView style={styles.emptyCard}>
+          <ThemedText type="body" themeColor="textSecondary">No teams yet. Create or join one above.</ThemedText>
+        </GlassView>
+      ) : null}
+
+      <View style={styles.teamList}>
+        {teams.map((team) => (
+          <GlassView key={team.id} style={styles.teamCard}>
+            <Pressable onPress={() => router.push({ pathname: "/team/[teamId]", params: { teamId: team.id, section: "overview" } })}>
+              <View style={styles.teamRow}>
+                <View style={[styles.colorBadge, { backgroundColor: team.color }]} />
+                <View style={{ flex: 1 }}>
+                  <ThemedText type="body">{team.name}</ThemedText>
+                  <ThemedText type="caption" themeColor="textSecondary">{team.memberCount} members</ThemedText>
+                </View>
+                <ThemedText type="caption" themeColor="textSecondary">{team.myRole}</ThemedText>
+              </View>
+            </Pressable>
+            <View style={styles.teamActions}>
+              <Pressable onPress={() => router.push({ pathname: "/team/[teamId]", params: { teamId: team.id, section: "tasks" } })} style={styles.teamActionChip}>
+                <ThemedText type="captionBold">Tasks</ThemedText>
+              </Pressable>
+              <Pressable onPress={() => router.push({ pathname: "/team/[teamId]", params: { teamId: team.id, section: "members" } })} style={styles.teamActionChip}>
+                <ThemedText type="captionBold">Members</ThemedText>
+              </Pressable>
+              <Pressable onPress={() => router.push({ pathname: "/team/[teamId]", params: { teamId: team.id, section: "conference" } })} style={styles.teamActionChip}>
+                <ThemedText type="captionBold">Call</ThemedText>
+              </Pressable>
+            </View>
+          </GlassView>
+        ))}
+      </View>
     </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    gap: Spacing.three,
+  header: {
+    gap: 2,
   },
-  heroCard: {
-    padding: Spacing.four,
-    borderRadius: 28,
-    gap: Spacing.three,
-  },
-  heroCopy: {
-    gap: Spacing.one,
-    backgroundColor: "transparent",
-  },
-  headerTitle: {
-    fontSize: 34,
-    lineHeight: 40,
-  },
-  heroStats: {
-    flexDirection: "row",
-    gap: Spacing.two,
-    backgroundColor: "transparent",
-  },
-  heroStatCard: {
-    flex: 1,
-    padding: Spacing.three,
-    borderRadius: 20,
-    gap: 4,
-  },
-  metricGrid: {
+  createRow: {
     flexDirection: "row",
     gap: Spacing.two,
   },
-  metricCard: {
-    flex: 1,
-    padding: Spacing.three,
-    borderRadius: 20,
-    gap: 4,
+  createChip: {
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.four,
+    borderRadius: 12,
   },
-  createCard: {
+  formCard: {
     padding: Spacing.four,
-    borderRadius: 24,
+    borderRadius: 16,
     gap: Spacing.three,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
-  focusCard: {
-    borderColor: Brand.primary,
-  },
-  requestCard: {
-    padding: Spacing.three,
-    borderRadius: 24,
-    gap: Spacing.two,
-  },
-  requestItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.two,
-  },
-  requestAccent: {
-    width: 12,
-    height: 42,
-    borderRadius: 999,
-  },
-  requestCopy: {
-    flex: 1,
-    gap: 4,
-  },
-  requestButton: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: 999,
-  },
   input: {
     borderWidth: 1,
-    borderRadius: 14,
+    borderRadius: 12,
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
-    fontSize: 16,
+    paddingVertical: Spacing.two,
+    fontSize: 15,
   },
   colorRow: {
     flexDirection: "row",
     gap: Spacing.two,
   },
   colorDot: {
-    width: 24,
-    height: 24,
+    width: 22,
+    height: 22,
     borderRadius: 999,
     borderWidth: 2,
   },
-  primaryButton: {
-    alignSelf: "flex-start",
-    paddingHorizontal: Spacing.four,
+  submitButton: {
+    borderRadius: 12,
     paddingVertical: Spacing.two,
-    borderRadius: 999,
-  },
-  primaryButtonText: {
-    color: "#f5f1ea",
+    alignItems: "center",
+    justifyContent: "center",
   },
   loadingWrap: {
     paddingVertical: Spacing.five,
+    alignItems: "center",
   },
   errorCard: {
     padding: Spacing.three,
-    borderRadius: 20,
+    borderRadius: 16,
+    gap: Spacing.one,
+  },
+  emptyCard: {
+    padding: Spacing.four,
+    borderRadius: 16,
     gap: Spacing.one,
   },
   teamList: {
@@ -527,41 +273,26 @@ const styles = StyleSheet.create({
   },
   teamCard: {
     padding: Spacing.three,
-    borderRadius: 24,
+    borderRadius: 16,
     gap: Spacing.two,
   },
-  teamHeader: {
+  teamRow: {
     flexDirection: "row",
-    gap: Spacing.two,
     alignItems: "center",
+    gap: Spacing.two,
   },
   colorBadge: {
-    width: 16,
-    height: 56,
+    width: 12,
+    height: 40,
     borderRadius: 999,
   },
-  teamCopy: {
-    flex: 1,
-    gap: 4,
-  },
-  rolePill: {
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one,
-    borderRadius: 999,
-  },
-  quickActionRow: {
+  teamActions: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.two,
-  },
-  quickActionChip: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: 999,
-  },
-  emptyCard: {
-    padding: Spacing.four,
-    borderRadius: 24,
     gap: Spacing.one,
+  },
+  teamActionChip: {
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 4,
+    borderRadius: 999,
   },
 });
