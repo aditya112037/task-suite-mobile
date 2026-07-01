@@ -13,7 +13,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [hasToken, setHasToken] = useState<boolean | null>(null);
 
   useEffect(() => {
-    getToken().then((token) => setHasToken(!!token));
+    console.log("[AuthProvider] MOUNTED, reading token...");
+    getToken().then((token) => {
+      console.log("[AuthProvider] getToken resolved:", token ? "has token" : "no token");
+      setHasToken(!!token);
+    });
+    return () => console.log("[AuthProvider] UNMOUNTED");
   }, []);
 
   async function checkToken() {

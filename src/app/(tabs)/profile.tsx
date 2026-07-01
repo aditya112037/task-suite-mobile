@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GlassView } from "expo-glass-effect";
+import { router } from "expo-router";
 import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, View } from "react-native";
 
 import { ScreenShell } from "@/components/screen-shell";
@@ -132,7 +133,7 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            <Pressable onPress={() => { console.log("[Profile] Sign Out pressed"); signOut(); }}
+            <Pressable onPress={() => { console.log("[Profile] Sign Out pressed"); signOut(); setTimeout(() => router.replace("/"), 0); }}
               style={[styles.signOut, { backgroundColor: Brand.primary }]}>
               <ThemedText type="captionBold" style={{ color: "#fff" }}>Sign Out</ThemedText>
             </Pressable>

@@ -14,12 +14,6 @@ export default function AuthLayout() {
     );
   }
 
-  if (hasToken) {
-    return (
-      <View style={styles.loading} />
-    );
-  }
-
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="login" />
