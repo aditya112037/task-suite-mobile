@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
 import { SymbolView } from "expo-symbols";
@@ -33,7 +33,6 @@ export default function HomePage() {
   const isTiny = height < 690 || width < 360;
   const promptLimit = isTiny ? 3 : isShort ? 4 : isCompact ? 6 : 8;
 
-  const navigatingRef = useRef(false);
   const isLoggedIn = hasToken === true;
   const prompts = useMemo(
     () => getIntentPrompts({ signedIn: isLoggedIn, hasTeamAccess: false, hasAdminTeamAccess: false }),
@@ -42,19 +41,6 @@ export default function HomePage() {
   const suggestions = useMemo(() => getIntentSuggestions(commandText, prompts), [commandText, prompts]);
   const visiblePrompts = showAllPrompts ? prompts : suggestions.length ? suggestions.slice(0, promptLimit) : prompts.slice(0, promptLimit);
   const hiddenPromptCount = Math.max(prompts.length - visiblePrompts.length, 0);
-
-  useEffect(() => {
-    if (hasToken === true && !navigatingRef.current) {
-      navigatingRef.current = true;
-      setTimeout(() => router.replace("/(tabs)"), 0);
-    }
-  }, [hasToken, router]);
-
-  useEffect(() => {
-    if (hasToken === false || hasToken === null) {
-      navigatingRef.current = false;
-    }
-  }, [hasToken]);
 
   function requireAuth() {
     router.push("/(auth)/login");

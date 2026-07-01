@@ -1,20 +1,10 @@
-import { useEffect, useRef } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import { Stack, useRouter } from "expo-router";
+import { Stack } from "expo-router";
 
 import { useAuth } from "@/services/auth-context";
 
 export default function AuthLayout() {
-  const router = useRouter();
   const { hasToken } = useAuth();
-  const navigatingRef = useRef(false);
-
-  useEffect(() => {
-    if (hasToken === true && !navigatingRef.current) {
-      navigatingRef.current = true;
-      setTimeout(() => router.replace("/(tabs)"), 0);
-    }
-  }, [hasToken, router]);
 
   if (hasToken === null) {
     return (
@@ -25,11 +15,7 @@ export default function AuthLayout() {
   }
 
   if (hasToken) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
+    return null;
   }
 
   return (
