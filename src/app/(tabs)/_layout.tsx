@@ -1,5 +1,6 @@
+import { useEffect, useRef } from "react";
 import { ActivityIndicator, StyleSheet, View, useColorScheme } from "react-native";
-import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router";
+import { DarkTheme, DefaultTheme, ThemeProvider, router } from "expo-router";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import AppTabs from "@/components/app-tabs";
@@ -9,6 +10,14 @@ import { useAuth } from "@/services/auth-context";
 export default function TabsLayout() {
   const colorScheme = useColorScheme();
   const { hasToken } = useAuth();
+  const prevHasToken = useRef(hasToken);
+
+  useEffect(() => {
+    if (prevHasToken.current === true && hasToken === false) {
+      router.replace("/");
+    }
+    prevHasToken.current = hasToken;
+  }, [hasToken]);
 
   if (hasToken === null) {
     return (
