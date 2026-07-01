@@ -13,7 +13,9 @@ export default function TabsLayout() {
   const prevHasToken = useRef(hasToken);
 
   useEffect(() => {
+    console.log("[TabsLayout] hasToken changed:", prevHasToken.current, "→", hasToken);
     if (prevHasToken.current === true && hasToken === false) {
+      console.log("[TabsLayout] hasToken transitioned true→false, navigating to /");
       router.replace("/");
     }
     prevHasToken.current = hasToken;
@@ -28,6 +30,7 @@ export default function TabsLayout() {
   }
 
   if (!hasToken) {
+    console.log("[TabsLayout] hasToken is false, rendering blank overlay");
     return (
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
         <View style={styles.loading} />

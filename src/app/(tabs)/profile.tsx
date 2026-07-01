@@ -132,7 +132,7 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            <Pressable onPress={signOut}
+            <Pressable onPress={() => { console.log("[Profile] Sign Out pressed"); signOut(); }}
               style={[styles.signOut, { backgroundColor: Brand.primary }]}>
               <ThemedText type="captionBold" style={{ color: "#fff" }}>Sign Out</ThemedText>
             </Pressable>

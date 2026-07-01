@@ -23,6 +23,7 @@ type WorkflowState = { key: IntentWorkflow };
 export default function HomePage() {
   const theme = useTheme();
   const { hasToken } = useAuth();
+  console.log("[Index] rendered, hasToken:", hasToken);
   const { width, height } = useWindowDimensions();
   const [commandText, setCommandText] = useState("");
   const [commandFeedback, setCommandFeedback] = useState("Search, prompt, and route into the right workspace.");

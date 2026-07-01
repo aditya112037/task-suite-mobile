@@ -22,7 +22,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
+    console.log("[AuthContext] signOut called, clearing token...");
     await logoutApi();
+    console.log("[AuthContext] token cleared, setting hasToken=false");
     setHasToken(false);
   }
 
