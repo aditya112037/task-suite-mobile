@@ -11,20 +11,14 @@ export default function TabsLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
   const { hasToken } = useAuth();
-  const redirectedRef = useRef(false);
+  const navigatingRef = useRef(false);
 
   useEffect(() => {
-    if (hasToken === false && !redirectedRef.current) {
-      redirectedRef.current = true;
-      router.replace("/");
+    if (hasToken === false && !navigatingRef.current) {
+      navigatingRef.current = true;
+      setTimeout(() => router.replace("/"), 0);
     }
   }, [hasToken, router]);
-
-  useEffect(() => {
-    if (hasToken === true) {
-      redirectedRef.current = false;
-    }
-  }, [hasToken]);
 
   if (hasToken === null) {
     return (

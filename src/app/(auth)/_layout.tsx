@@ -1,26 +1,20 @@
 import { useEffect, useRef } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import { Redirect, Stack, useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 
 import { useAuth } from "@/services/auth-context";
 
 export default function AuthLayout() {
   const router = useRouter();
   const { hasToken } = useAuth();
-  const redirectedRef = useRef(false);
+  const navigatingRef = useRef(false);
 
   useEffect(() => {
-    if (hasToken === true && !redirectedRef.current) {
-      redirectedRef.current = true;
-      router.replace("/(tabs)");
+    if (hasToken === true && !navigatingRef.current) {
+      navigatingRef.current = true;
+      setTimeout(() => router.replace("/(tabs)"), 0);
     }
   }, [hasToken, router]);
-
-  useEffect(() => {
-    if (hasToken === false) {
-      redirectedRef.current = false;
-    }
-  }, [hasToken]);
 
   if (hasToken === null) {
     return (
