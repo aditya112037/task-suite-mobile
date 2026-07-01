@@ -19,7 +19,11 @@ export default function TabsLayout() {
   }
 
   if (!hasToken) {
-    return null;
+    return (
+      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+        <View style={styles.loading} />
+      </ThemeProvider>
+    );
   }
 
   return (

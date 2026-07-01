@@ -15,7 +15,9 @@ export default function AuthLayout() {
   }
 
   if (hasToken) {
-    return null;
+    return (
+      <View style={styles.loading} />
+    );
   }
 
   return (
