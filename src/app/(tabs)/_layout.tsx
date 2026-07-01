@@ -1,5 +1,5 @@
 import { ActivityIndicator, StyleSheet, View, useColorScheme } from "react-native";
-import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router";
+import { DarkTheme, DefaultTheme, Redirect, ThemeProvider } from "expo-router";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import AppTabs from "@/components/app-tabs";
@@ -16,6 +16,10 @@ export default function TabsLayout() {
         <ActivityIndicator size="large" />
       </View>
     );
+  }
+
+  if (!hasToken) {
+    return <Redirect href="/" />;
   }
 
   return (
