@@ -1,39 +1,47 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
+import { SymbolView } from "expo-symbols";
+import { GlassView } from "expo-glass-effect";
 import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput, View } from "react-native";
+import Animated, { FadeInDown, LinearTransition } from "react-native-reanimated";
 
-import { AppCard } from "@/components/app-card";
 import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { Brand, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/services/auth-context";
 import { getProfile, type ProfileSummary } from "@/services/profile";
-import { getTasks, createTask, type PersonalTask } from "@/services/tasks";
 import { getMyTeamTasks, type TeamTask } from "@/services/team-tasks";
-import { getTeams, type TeamSummary } from "@/services/teams";
+import { createTask, getTasks, type PersonalTask } from "@/services/tasks";
+import { getConferenceStatus, getTeams, type TeamSummary } from "@/services/teams";
 
-function formatShortDate(value: string | null) {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
+type MeetingSignal = {
+  teamId: string;
+  teamName: string;
+  active: boolean;
+  participantCount: number;
+};
 
 function isToday(value: string | null) {
   if (!value) return false;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return false;
-  const now = new Date();
-  return date.toDateString() === now.toDateString();
+  return date.toDateString() === new Date().toDateString();
 }
 
-function isOverdue(value: string | null) {
+function isWithinDays(value: string | null, days: number) {
   if (!value) return false;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return false;
-  return date.getTime() < Date.now();
+  const diff = date.getTime() - Date.now();
+  return diff >= 0 && diff <= days * 24 * 60 * 60 * 1000;
+}
+
+function formatDateLabel(value: string | null) {
+  if (!value) return "No deadline";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "No deadline";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function getGreeting() {
@@ -50,30 +58,44 @@ export default function HomeIntentScreen() {
   const [teams, setTeams] = useState<TeamSummary[]>([]);
   const [personalTasks, setPersonalTasks] = useState<PersonalTask[]>([]);
   const [teamTasks, setTeamTasks] = useState<TeamTask[]>([]);
+  const [meetingSignals, setMeetingSignals] = useState<MeetingSignal[]>([]);
   const [quickCapture, setQuickCapture] = useState("");
   const [capturing, setCapturing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const overdue = useMemo(
-    () => personalTasks.filter((t) => t.status !== "completed" && isOverdue(t.dueDate)),
+  const openTasks = useMemo(
+    () => personalTasks.filter((task) => task.status !== "completed"),
     [personalTasks]
   );
-
-  const dueToday = useMemo(
-    () => personalTasks.filter((t) => t.status !== "completed" && isToday(t.dueDate)),
+  const todayAgenda = useMemo(
+    () => openTasks.filter((task) => isToday(task.dueDate)).slice(0, 3),
+    [openTasks]
+  );
+  const dueSoon = useMemo(
+    () =>
+      openTasks
+        .filter((task) => isWithinDays(task.dueDate, 3) || isToday(task.dueDate))
+        .sort((left, right) => {
+          const leftTime = left.dueDate ? new Date(left.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+          const rightTime = right.dueDate ? new Date(right.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+          return leftTime - rightTime;
+        })
+        .slice(0, 4),
+    [openTasks]
+  );
+  const activeFocus = useMemo(
+    () => personalTasks.find((task) => task.status === "in-progress") || dueSoon[0] || openTasks[0] || null,
+    [dueSoon, openTasks, personalTasks]
+  );
+  const continueWorking = useMemo(
+    () => personalTasks.filter((task) => task.status === "in-progress").slice(0, 2),
     [personalTasks]
   );
-
-  const activeTasks = useMemo(
-    () => personalTasks.filter((t) => t.status === "in-progress"),
-    [personalTasks]
-  );
-
-  const assignedTasks = useMemo(() => {
+  const assignedToMe = useMemo(() => {
     if (!profile) return [];
-    return teamTasks.filter((task) => task.assigneeIds.includes(profile.id));
+    return teamTasks.filter((task) => task.assigneeIds.includes(profile.id) && task.status !== "completed");
   }, [profile, teamTasks]);
 
   const loadHome = useCallback(
@@ -89,10 +111,32 @@ export default function HomeIntentScreen() {
           getTeams(nextProfile.id),
         ]);
 
+        const conferenceSignals = await Promise.all(
+          nextTeams.slice(0, 3).map(async (team) => {
+            try {
+              const status = await getConferenceStatus(team.id);
+              return {
+                teamId: team.id,
+                teamName: team.name,
+                active: status.active,
+                participantCount: status.conference?.participantCount || 0,
+              } satisfies MeetingSignal;
+            } catch {
+              return {
+                teamId: team.id,
+                teamName: team.name,
+                active: false,
+                participantCount: 0,
+              } satisfies MeetingSignal;
+            }
+          })
+        );
+
         setProfile(nextProfile);
         setPersonalTasks(nextPersonalTasks);
         setTeamTasks(nextTeamTasks);
         setTeams(nextTeams);
+        setMeetingSignals(conferenceSignals);
         setError(null);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to load your workspace";
@@ -120,7 +164,7 @@ export default function HomeIntentScreen() {
     setCapturing(true);
     try {
       const created = await createTask({ title: trimmed, workspace: "work" });
-      setPersonalTasks((prev) => [created, ...prev]);
+      setPersonalTasks((current) => [created, ...current]);
       setQuickCapture("");
     } catch (err) {
       Alert.alert("Error", err instanceof Error ? err.message : "Could not create task");
@@ -131,191 +175,405 @@ export default function HomeIntentScreen() {
 
   return (
     <ScreenShell refreshing={refreshing} onRefresh={() => loadHome(true)}>
-      <View style={styles.greeting}>
-        <ThemedText type="body" themeColor="textSecondary">
-          {getGreeting()},
-        </ThemedText>
-        <ThemedText type="hero">
-          {profile?.name.split(" ")[0] || "there"}
-        </ThemedText>
-      </View>
+      <Animated.View layout={LinearTransition.springify().damping(18).stiffness(170)} style={styles.container}>
+        <Animated.View entering={FadeInDown.duration(260)} style={styles.hero}>
+          <View style={styles.heroHeading}>
+            <View style={styles.heroCopy}>
+              <ThemedText type="caption" themeColor="textSecondary">
+                {getGreeting()}
+              </ThemedText>
+              <ThemedText type="hero">
+                {profile?.name.split(" ")[0] || "there"}
+              </ThemedText>
+              <ThemedText type="body" themeColor="textSecondary">
+                Native, fast, and built around what needs attention now.
+              </ThemedText>
+            </View>
 
-      {loading ? (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color={theme.textSecondary} />
-        </View>
-      ) : null}
+            <Pressable
+              onPress={() => router.push("/profile")}
+              style={[
+                styles.heroBadge,
+                {
+                  backgroundColor: theme.backgroundElement,
+                  borderColor: theme.cardBorder,
+                },
+              ]}>
+              <SymbolView
+                name={{ ios: "person.crop.circle.fill", android: "account_circle" }}
+                size={22}
+                tintColor={theme.primary}
+              />
+              <ThemedText type="captionBold">
+                {profile?.progress.activeTasks || openTasks.length} active
+              </ThemedText>
+            </Pressable>
+          </View>
 
-      {error ? (
-        <AppCard variant="soft">
-          <ThemedText type="cardTitle">Couldn&apos;t sync</ThemedText>
-          <ThemedText type="caption" themeColor="textSecondary">{error}</ThemedText>
-          <Pressable onPress={() => loadHome()}>
-            <ThemedText type="captionBold" themeColor="primary">Retry</ThemedText>
-          </Pressable>
-        </AppCard>
-      ) : null}
+          <View
+            style={[
+              styles.captureBar,
+              {
+                backgroundColor: theme.heroSurface,
+                borderColor: theme.cardBorder,
+              },
+            ]}>
+            <TextInput
+              value={quickCapture}
+              onChangeText={setQuickCapture}
+              placeholder='Type or say later: "remind me tomorrow..."'
+              placeholderTextColor={theme.textSecondary}
+              onSubmitEditing={handleQuickCapture}
+              style={[styles.captureInput, { color: theme.text }]}
+            />
+            <Pressable
+              onPress={handleQuickCapture}
+              disabled={capturing || !quickCapture.trim()}
+              style={[
+                styles.captureButton,
+                {
+                  backgroundColor: theme.primary,
+                  opacity: capturing || !quickCapture.trim() ? 0.55 : 1,
+                },
+              ]}>
+              {capturing ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <SymbolView name={{ ios: "mic.fill", android: "mic" }} size={18} tintColor="#fff" />
+              )}
+            </Pressable>
+          </View>
+        </Animated.View>
 
-      <View style={styles.actionRow}>
-        {overdue.length > 0 ? (
-          <View style={[styles.actionCard, { backgroundColor: "rgba(217, 75, 75, 0.12)" }]}>
-            <ThemedText type="cardTitle" style={{ color: "#d94b4b" }}>{overdue.length} overdue</ThemedText>
-            <ThemedText type="caption" style={{ color: "#d94b4b" }}>
-              {overdue[0]?.title?.slice(0, 30)}{overdue[0]?.title?.length > 30 ? "..." : ""}
-            </ThemedText>
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color={theme.textSecondary} />
           </View>
         ) : null}
-        {dueToday.length > 0 ? (
-          <View style={[styles.actionCard, { backgroundColor: theme.backgroundSelected }]}>
-            <ThemedText type="cardTitle" themeColor="primary">{dueToday.length} due today</ThemedText>
+
+        {error ? (
+          <GlassView style={styles.errorCard}>
+            <ThemedText type="cardTitle">Couldn&apos;t sync</ThemedText>
             <ThemedText type="caption" themeColor="textSecondary">
-              {dueToday[0]?.title?.slice(0, 30)}{dueToday[0]?.title?.length > 30 ? "..." : ""}
+              {error}
             </ThemedText>
-          </View>
+          </GlassView>
         ) : null}
-        {assignedTasks.length > 0 ? (
-          <View style={[styles.actionCard, { backgroundColor: theme.backgroundElement, borderColor: theme.cardBorder, borderWidth: 1 }]}>
-            <ThemedText type="cardTitle">{assignedTasks.length} assigned</ThemedText>
-            <ThemedText type="caption" themeColor="textSecondary">
-              {assignedTasks[0]?.teamName} - {assignedTasks[0]?.title?.slice(0, 20)}
-            </ThemedText>
-          </View>
-        ) : null}
-      </View>
 
-      <View style={styles.quickCaptureRow}>
-        <TextInput
-          value={quickCapture}
-          onChangeText={setQuickCapture}
-          placeholder="Add a task..."
-          placeholderTextColor={theme.textSecondary}
-          onSubmitEditing={handleQuickCapture}
-          style={[styles.quickInput, { color: theme.text, borderColor: theme.divider, backgroundColor: theme.backgroundElement }]}
-        />
-        <Pressable
-          onPress={handleQuickCapture}
-          disabled={capturing || !quickCapture.trim()}
-          style={[styles.quickButton, { backgroundColor: theme.primary, opacity: capturing || !quickCapture.trim() ? 0.5 : 1 }]}>
-          {capturing ? <ActivityIndicator color="#fff" size="small" /> : <ThemedText type="captionBold" style={styles.buttonText}>Add</ThemedText>}
-        </Pressable>
-      </View>
+        <Animated.View entering={FadeInDown.delay(40).duration(260)} style={styles.widgetGrid}>
+          <WidgetCard
+            title="Today's agenda"
+            icon={{ ios: "checklist", android: "view_list" }}
+            accent={theme.primary}>
+            {todayAgenda.length ? (
+              todayAgenda.map((task) => (
+                <AgendaRow
+                  key={task.id}
+                  label={task.title}
+                  meta={formatDateLabel(task.dueDate)}
+                  onPress={() => router.push("/remote-work")}
+                />
+              ))
+            ) : (
+              <EmptyState copy="Nothing locked to today yet. Shape the day before it shapes you." />
+            )}
+          </WidgetCard>
 
-      {activeTasks.length > 0 ? (
-        <View>
-          <ThemedText type="captionBold" themeColor="textSecondary" style={styles.sectionLabel}>IN PROGRESS</ThemedText>
-          <View style={styles.taskStack}>
-            {activeTasks.slice(0, 3).map((task) => (
-              <Pressable key={task.id} onPress={() => router.push("/remote-work")}>
-                <AppCard>
-                  <View style={styles.taskRow}>
-                    <ThemedText type="body" style={{ flex: 1 }}>{task.title}</ThemedText>
-                    <ThemedText type="caption" themeColor="textSecondary">{task.progressPercentage}%</ThemedText>
+          <WidgetCard
+            title="Due soon"
+            icon={{ ios: "clock.fill", android: "schedule" }}
+            accent={Brand.warning}>
+            {dueSoon.length ? (
+              dueSoon.map((task) => (
+                <AgendaRow
+                  key={task.id}
+                  label={task.title}
+                  meta={formatDateLabel(task.dueDate)}
+                  onPress={() => router.push("/remote-work")}
+                />
+              ))
+            ) : (
+              <EmptyState copy="Your next three days are surprisingly clear." />
+            )}
+          </WidgetCard>
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(80).duration(260)} style={styles.widgetGrid}>
+          <WidgetCard
+            title="Focus mode"
+            icon={{ ios: "bolt.fill", android: "flash_on" }}
+            accent={Brand.secondary}
+            large>
+            {activeFocus ? (
+              <Pressable onPress={() => router.push("/remote-work")} style={styles.focusBody}>
+                <ThemedText type="cardTitle">{activeFocus.title}</ThemedText>
+                <ThemedText type="caption" themeColor="textSecondary">
+                  {activeFocus.status === "in-progress" ? "Already moving" : "Best next move"} - {activeFocus.progressPercentage}% complete
+                </ThemedText>
+                <View style={[styles.progressTrack, { backgroundColor: theme.divider }]}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      { width: `${Math.max(8, activeFocus.progressPercentage)}%`, backgroundColor: theme.primary },
+                    ]}
+                  />
+                </View>
+              </Pressable>
+            ) : (
+              <EmptyState copy="No focus task yet. Capture one and we can make this screen come alive." />
+            )}
+          </WidgetCard>
+
+          <WidgetCard
+            title="Upcoming meetings"
+            icon={{ ios: "video.fill", android: "videocam" }}
+            accent={theme.primaryLight}>
+            {meetingSignals.length ? (
+              meetingSignals.map((meeting) => (
+                <AgendaRow
+                  key={meeting.teamId}
+                  label={meeting.teamName}
+                  meta={meeting.active ? `${meeting.participantCount} in room now` : "Ready to host when you are"}
+                  onPress={() => router.push("/teams")}
+                />
+              ))
+            ) : (
+              <EmptyState copy="No team rooms connected yet." />
+            )}
+          </WidgetCard>
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(120).duration(260)} style={styles.widgetGrid}>
+          <WidgetCard
+            title="Continue working"
+            icon={{ ios: "arrow.trianglehead.clockwise", android: "autorenew" }}
+            accent={theme.primary}
+            large>
+            {continueWorking.length ? (
+              continueWorking.map((task) => (
+                <Pressable key={task.id} onPress={() => router.push("/remote-work")} style={styles.continueCard}>
+                  <View style={styles.continueHeader}>
+                    <ThemedText type="body" style={{ flex: 1 }}>
+                      {task.title}
+                    </ThemedText>
+                    <ThemedText type="captionBold">{task.progressPercentage}%</ThemedText>
                   </View>
                   <View style={[styles.progressTrack, { backgroundColor: theme.divider }]}>
-                    <View style={[styles.progressFill, { width: `${task.progressPercentage}%`, backgroundColor: theme.primary }]} />
+                    <View
+                      style={[
+                        styles.progressFill,
+                        { width: `${Math.max(8, task.progressPercentage)}%`, backgroundColor: theme.primary },
+                      ]}
+                    />
                   </View>
-                </AppCard>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      ) : null}
+                </Pressable>
+              ))
+            ) : (
+              <EmptyState copy="Start a task and it will stay pinned here for one-tap resume." />
+            )}
+          </WidgetCard>
 
-      <View>
-        <ThemedText type="captionBold" themeColor="textSecondary" style={styles.sectionLabel}>QUICK ACCESS</ThemedText>
-        <View style={styles.quickGrid}>
-          <Pressable onPress={() => router.push("/remote-work")} style={[styles.quickItem, { backgroundColor: theme.backgroundElement, borderColor: theme.cardBorder, borderWidth: 1 }]}>
-            <ThemedText type="cardTitle">{personalTasks.filter((t) => t.status !== "completed").length}</ThemedText>
-            <ThemedText type="caption" themeColor="textSecondary">Open tasks</ThemedText>
-          </Pressable>
-          <Pressable onPress={() => router.push("/teams")} style={[styles.quickItem, { backgroundColor: theme.backgroundElement, borderColor: theme.cardBorder, borderWidth: 1 }]}>
-            <ThemedText type="cardTitle">{teams.length}</ThemedText>
-            <ThemedText type="caption" themeColor="textSecondary">Teams</ThemedText>
-          </Pressable>
-          <Pressable onPress={() => {
-            const pct = profile?.progress.personalTotalTasks
-              ? Math.round((profile.progress.personalCompletedTasks / profile.progress.personalTotalTasks) * 100)
-              : 0;
-            Alert.alert("Progress", `${pct}% complete overall`);
-          }} style={[styles.quickItem, { backgroundColor: theme.backgroundElement, borderColor: theme.cardBorder, borderWidth: 1 }]}>
-            <ThemedText type="cardTitle">
-              {profile?.progress.personalTotalTasks
-                ? Math.round((profile.progress.personalCompletedTasks / profile.progress.personalTotalTasks) * 100)
-                : 0}%
-            </ThemedText>
-            <ThemedText type="caption" themeColor="textSecondary">Progress</ThemedText>
-          </Pressable>
-        </View>
-      </View>
-
-      {personalTasks.length === 0 && !loading ? (
-        <AppCard variant="soft">
-          <ThemedText type="body" themeColor="textSecondary">No tasks yet. Use the quick capture above to add your first one.</ThemedText>
-        </AppCard>
-      ) : null}
+          <WidgetCard
+            title="Team pulse"
+            icon={{ ios: "person.3.fill", android: "groups" }}
+            accent={Brand.secondary}>
+            <AgendaRow
+              label={`${teams.length} workspaces`}
+              meta={`${assignedToMe.length} assigned to you`}
+              onPress={() => router.push("/teams")}
+            />
+            <AgendaRow
+              label={`${teamTasks.filter((task) => task.status !== "completed").length} open team tasks`}
+              meta="Coordination lives here"
+              onPress={() => router.push("/teams")}
+            />
+          </WidgetCard>
+        </Animated.View>
+      </Animated.View>
     </ScreenShell>
   );
 }
 
+function WidgetCard({
+  title,
+  icon,
+  accent,
+  large = false,
+  children,
+}: {
+  title: string;
+  icon: { ios: string; android: string };
+  accent: string;
+  large?: boolean;
+  children: ReactNode;
+}) {
+  const theme = useTheme();
+
+  return (
+    <GlassView
+      style={[
+        styles.widgetCard,
+        large ? styles.largeCard : null,
+        {
+          borderColor: theme.cardBorder,
+        },
+      ]}>
+      <View style={styles.widgetHeader}>
+        <View style={[styles.widgetIcon, { backgroundColor: `${accent}22` }]}>
+          <SymbolView name={icon} size={16} tintColor={accent} />
+        </View>
+        <ThemedText type="cardTitle">{title}</ThemedText>
+      </View>
+      <View style={styles.widgetBody}>{children}</View>
+    </GlassView>
+  );
+}
+
+function AgendaRow({
+  label,
+  meta,
+  onPress,
+}: {
+  label: string;
+  meta: string;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        styles.agendaRow,
+        {
+          backgroundColor: theme.backgroundElement,
+          borderColor: theme.cardBorder,
+        },
+      ]}>
+      <View style={[styles.agendaDot, { backgroundColor: theme.primary }]} />
+      <View style={{ flex: 1 }}>
+        <ThemedText type="body" numberOfLines={1}>
+          {label}
+        </ThemedText>
+        <ThemedText type="caption" themeColor="textSecondary">
+          {meta}
+        </ThemedText>
+      </View>
+      <SymbolView name={{ ios: "chevron.right", android: "chevron_right" }} size={16} tintColor={theme.textSecondary} />
+    </Pressable>
+  );
+}
+
+function EmptyState({ copy }: { copy: string }) {
+  return (
+    <ThemedText type="caption" themeColor="textSecondary">
+      {copy}
+    </ThemedText>
+  );
+}
+
 const styles = StyleSheet.create({
-  greeting: {
-    gap: 2,
+  container: {
+    gap: Spacing.three,
+  },
+  hero: {
+    gap: Spacing.three,
+  },
+  heroHeading: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: Spacing.two,
+  },
+  heroCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  heroBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 10,
+  },
+  captureBar: {
+    borderWidth: 1,
+    borderRadius: 24,
+    padding: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two,
+  },
+  captureInput: {
+    flex: 1,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 10,
+    fontSize: 15,
+  },
+  captureButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
   },
   loadingWrap: {
     paddingVertical: Spacing.five,
     alignItems: "center",
   },
-  actionRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.two,
+  errorCard: {
+    padding: Spacing.three,
+    borderRadius: 20,
+    gap: Spacing.one,
   },
-  actionCard: {
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    borderRadius: 14,
-    gap: 2,
-    minWidth: "47%",
-    flex: 1,
+  widgetGrid: {
+    gap: Spacing.three,
   },
-  quickCaptureRow: {
+  widgetCard: {
+    borderRadius: 28,
+    borderWidth: 1,
+    padding: Spacing.three,
+    gap: Spacing.three,
+  },
+  largeCard: {
+    minHeight: 170,
+  },
+  widgetHeader: {
     flexDirection: "row",
-    gap: Spacing.two,
     alignItems: "center",
+    gap: Spacing.two,
   },
-  quickInput: {
-    flex: 1,
+  widgetIcon: {
+    width: 30,
+    height: 30,
     borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  widgetBody: {
+    gap: Spacing.two,
+  },
+  agendaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two,
+    borderRadius: 18,
     borderWidth: 1,
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    fontSize: 15,
+    paddingVertical: 12,
   },
-  quickButton: {
-    borderRadius: 12,
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    justifyContent: "center",
-    alignItems: "center",
+  agendaDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
   },
-  buttonText: {
-    color: "#fff",
-  },
-  sectionLabel: {
-    marginBottom: Spacing.two,
-    marginTop: Spacing.one,
-    letterSpacing: 1,
-  },
-  taskStack: {
-    gap: Spacing.two,
-  },
-  taskRow: {
-    flexDirection: "row",
-    alignItems: "center",
+  focusBody: {
     gap: Spacing.two,
   },
   progressTrack: {
-    height: 4,
+    height: 6,
     borderRadius: 999,
     overflow: "hidden",
   },
@@ -323,16 +581,12 @@ const styles = StyleSheet.create({
     height: "100%",
     borderRadius: 999,
   },
-  quickGrid: {
-    flexDirection: "row",
+  continueCard: {
     gap: Spacing.two,
   },
-  quickItem: {
-    flex: 1,
-    paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.two,
-    borderRadius: 14,
-    gap: 2,
+  continueHeader: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: Spacing.two,
   },
 });
