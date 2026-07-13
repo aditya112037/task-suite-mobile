@@ -177,14 +177,38 @@ export default function HomeIntentScreen() {
     <ScreenShell refreshing={refreshing} onRefresh={() => loadHome(true)}>
       <Animated.View layout={LinearTransition.springify().damping(18).stiffness(170)} style={styles.container}>
         <Animated.View entering={FadeInDown.duration(260)} style={styles.hero}>
+          <View style={styles.topRow}>
+            <Pressable
+              onPress={() => router.push("/")}
+              style={[
+                styles.intentHomeButton,
+                {
+                  backgroundColor: theme.backgroundElement,
+                  borderColor: theme.cardBorder,
+                },
+              ]}>
+              <SymbolView
+                name={{ ios: "house.fill", android: "home" }}
+                size={16}
+                tintColor={theme.primary}
+              />
+              <ThemedText type="captionBold">Intent Home</ThemedText>
+            </Pressable>
+            <ThemedText type="caption" themeColor="textSecondary">
+              Dashboard
+            </ThemedText>
+          </View>
+
           <View style={styles.heroHeading}>
             <View style={styles.heroCopy}>
               <ThemedText type="caption" themeColor="textSecondary">
                 {getGreeting()}
               </ThemedText>
-              <ThemedText type="hero">
-                {profile?.name.split(" ")[0] || "there"}
-              </ThemedText>
+              <Pressable onPress={() => router.push("/")}>
+                <ThemedText type="hero">
+                  {profile?.name.split(" ")[0] || "there"}
+                </ThemedText>
+              </Pressable>
               <ThemedText type="body" themeColor="textSecondary">
                 Native, fast, and built around what needs attention now.
               </ThemedText>
@@ -478,6 +502,21 @@ const styles = StyleSheet.create({
   },
   hero: {
     gap: Spacing.three,
+  },
+  topRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: Spacing.two,
+  },
+  intentHomeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 10,
   },
   heroHeading: {
     flexDirection: "row",

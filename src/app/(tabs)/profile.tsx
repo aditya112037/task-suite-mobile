@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { router } from "expo-router";
 import { GlassView } from "expo-glass-effect";
-import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 
 import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { Brand, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/services/auth-context";
@@ -48,7 +48,9 @@ export default function ProfileScreen() {
   return (
     <ScreenShell refreshing={refreshing} onRefresh={() => loadProfile(true)}>
       <View style={styles.container}>
-        <ThemedText type="hero">{profile?.name || "Profile"}</ThemedText>
+        <Pressable onPress={() => router.push("/")} style={styles.nameLink}>
+          <ThemedText type="hero">{profile?.name || "Profile"}</ThemedText>
+        </Pressable>
         <ThemedText type="caption" themeColor="textSecondary">{profile?.email || ""}</ThemedText>
 
         {loading ? (
@@ -146,6 +148,9 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     gap: Spacing.three,
+  },
+  nameLink: {
+    alignSelf: "flex-start",
   },
   loadingWrap: {
     paddingVertical: Spacing.five,
