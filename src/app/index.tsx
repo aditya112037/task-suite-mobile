@@ -241,7 +241,7 @@ export default function HomePage() {
         ) : null}
 
         <Pressable
-          onPress={() => (isLoggedIn ? router.push("/(tabs)") : requireAuth())}
+          onPress={() => (isLoggedIn ? router.push("/dashboard") : requireAuth())}
           style={[styles.primaryCta, isTiny ? styles.primaryCtaTiny : null, { backgroundColor: theme.primary }]}>
           <SymbolView name={{ ios: "square.grid.2x2.fill", android: "dashboard" }} size={20} tintColor="#f5f1ea" />
           <ThemedText type="smallBold" style={[styles.primaryCtaText, isCompact ? styles.primaryCtaTextCompact : null]}>

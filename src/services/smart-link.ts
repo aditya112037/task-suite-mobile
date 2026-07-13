@@ -29,7 +29,8 @@ export function resolveInternalHref(rawHref: string): Href | null {
 
     const pathname = normalizePathname(url.pathname);
 
-    if (pathname === "/" || pathname === "/home") return "/(tabs)" as Href;
+    if (pathname === "/") return "/" as Href;
+    if (pathname === "/home") return "/dashboard" as Href;
     if (pathname === "/teams") return "/(tabs)/teams" as Href;
     if (pathname === "/profile") return "/(tabs)/profile" as Href;
     if (pathname === "/tasks" || pathname === "/remote-work") return "/(tabs)/remote-work" as Href;

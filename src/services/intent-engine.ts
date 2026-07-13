@@ -31,11 +31,11 @@ type ResolveResult = {
 
 const ROUTES: IntentRoute[] = [
   { matcher: ["login", "log in", "sign in", "signin", "register", "sign up", "signup", "create account"], path: "/login", protected: false, feedback: "Opening sign in." },
-  { matcher: ["home", "dashboard", "overview", "workspace", "progress"], path: "/(tabs)", protected: true, feedback: "Opening your home workspace." },
+  { matcher: ["home", "dashboard", "overview", "workspace", "progress"], path: "/dashboard", protected: true, feedback: "Opening your dashboard." },
   { matcher: ["profile", "my profile", "account"], path: "/profile", protected: true, feedback: "Opening your profile." },
   { matcher: ["task", "tasks", "todo", "todos", "my tasks", "personal tasks"], workflow: "tasks", feedback: "Choose what you want to do with tasks." },
   { matcher: ["create task", "create a task", "new task", "add task"], action: "create_task", feedback: "Starting a task flow." },
-  { matcher: ["assigned tasks", "assigned task", "my assigned tasks"], path: "/(tabs)", protected: true, feedback: "Opening assigned work." },
+  { matcher: ["assigned tasks", "assigned task", "my assigned tasks"], path: "/dashboard", protected: true, feedback: "Opening assigned work." },
   { matcher: ["teams", "team", "team workspace", "workspace teams", "group"], workflow: "teams", feedback: "Choose how you want to work with teams." },
   { matcher: ["create team", "start a team", "new team"], action: "create_team", feedback: "Starting the team creation flow." },
   { matcher: ["join team", "join workspace", "team invite", "invite"], action: "join_team", feedback: "Starting the team join flow." },

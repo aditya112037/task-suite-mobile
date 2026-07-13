@@ -50,7 +50,7 @@ export default function LoginScreen() {
         : await login(email, password);
       Alert.alert("Success", `Welcome ${user.name}`);
       await checkToken();
-      router.replace("/(tabs)");
+      router.replace("/dashboard");
     } catch (error: any) {
       Alert.alert("Error", error.message);
     } finally {
@@ -64,7 +64,7 @@ export default function LoginScreen() {
       const user = await signInWithGoogle();
       Alert.alert("Success", `Welcome ${user.name}`);
       await checkToken();
-      router.replace("/(tabs)");
+      router.replace("/dashboard");
     } catch (error: any) {
       Alert.alert("Error", error.message);
     } finally {

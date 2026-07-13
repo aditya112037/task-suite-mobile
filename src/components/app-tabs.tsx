@@ -15,7 +15,7 @@ export default function AppTabs() {
         selected: { color: colors.text, fontWeight: '700' },
         default: { color: colors.textSecondary },
       }}>
-      <NativeTabs.Trigger name="index">
+      <NativeTabs.Trigger name="dashboard">
         <NativeTabs.Trigger.Label>Dashboard</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           sf={{ default: "square.grid.2x2", selected: "square.grid.2x2.fill" }}
