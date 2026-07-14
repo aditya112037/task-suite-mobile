@@ -136,15 +136,28 @@ export default function HomePage() {
             <ThemedText style={[styles.brandMark, { color: theme.textSecondary }]}>TM</ThemedText>
           </ThemedView>
 
-          <Pressable
-            onPress={() => router.push(isLoggedIn ? "/profile" : "/(auth)/login")}
-            style={[
-              styles.avatarButton,
-              isCompact ? styles.avatarButtonCompact : null,
-              { borderColor: theme.cardBorder, backgroundColor: theme.backgroundElement },
-            ]}>
-            <ThemedText style={[styles.avatarEmoji, isTiny ? styles.avatarEmojiTiny : null]}>☆</ThemedText>
-          </Pressable>
+          <View style={styles.headerActions}>
+            {isLoggedIn ? (
+              <Pressable
+                onPress={() => router.push("/notifications" as never)}
+                style={[
+                  styles.iconButton,
+                  isCompact ? styles.iconButtonCompact : null,
+                  { borderColor: theme.cardBorder, backgroundColor: theme.backgroundElement },
+                ]}>
+                <SymbolView name={{ ios: "bell.fill", android: "notifications" }} size={18} tintColor={theme.primary} />
+              </Pressable>
+            ) : null}
+            <Pressable
+              onPress={() => router.push(isLoggedIn ? "/profile" : "/(auth)/login")}
+              style={[
+                styles.avatarButton,
+                isCompact ? styles.avatarButtonCompact : null,
+                { borderColor: theme.cardBorder, backgroundColor: theme.backgroundElement },
+              ]}>
+              <ThemedText style={[styles.avatarEmoji, isTiny ? styles.avatarEmojiTiny : null]}>☆</ThemedText>
+            </Pressable>
+          </View>
         </ThemedView>
 
         <ThemedView
@@ -308,6 +321,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two,
+  },
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconButtonCompact: {
+    width: 38,
+    height: 38,
   },
   brandBlock: {
     flexDirection: "row",

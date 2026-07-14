@@ -31,6 +31,14 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
+      <NativeTabs.Trigger name="calendar">
+        <NativeTabs.Trigger.Label>Calendar</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: "calendar", selected: "calendar.circle.fill" }}
+          md={{ default: "calendar_month", selected: "calendar_month" }}
+        />
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="teams">
         <NativeTabs.Trigger.Label>Teams</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon

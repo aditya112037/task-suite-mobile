@@ -216,7 +216,7 @@ export const DEFAULT_THEME_PRESET: ThemePresetKey = 'light';
 
 export const Colors = Object.fromEntries(
   Object.entries(ThemePresets).map(([key, value]) => [key, value.palette])
-) as Record<ThemePresetKey, ThemePalette>;
+) as unknown as Record<ThemePresetKey, ThemePalette>;
 
 export type ThemeColor = keyof ThemePalette;
 export type ThemeTextColor = Exclude<ThemeColor, 'pageGradient'>;

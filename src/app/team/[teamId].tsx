@@ -30,6 +30,13 @@ import {
   updateTeamTask,
   type TeamTask,
 } from "@/services/team-tasks";
+import {
+  createLeaveRequest,
+  getMyLeaveRequests,
+  getTeamLeaveRequests,
+  reviewLeaveRequest,
+  type LeaveRequest,
+} from "@/services/leave-requests";
 
 const TEAM_SECTIONS = ["overview", "attendance", "tasks", "members", "extensions", "conference", "settings"] as const;
 type TeamSection = (typeof TEAM_SECTIONS)[number];
@@ -56,6 +63,8 @@ export default function TeamDetailsScreen() {
     active: false, participantCount: 0, conferenceId: null,
   });
   const [inviteLink, setInviteLink] = useState("");
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+  const [myLeaveRequests, setMyLeaveRequests] = useState<LeaveRequest[]>([]);
   const [currentUserId, setCurrentUserId] = useState("");
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [selectedAssigneeIds, setSelectedAssigneeIds] = useState<string[]>([]);
@@ -81,9 +90,10 @@ export default function TeamDetailsScreen() {
       if (isRefresh) setRefreshing(true); else setLoading(true);
       const profile = await getProfile();
       const dateKey = getDateKey();
-      const [nextTeam, nextAttendance, nextTasks, nextConference, nextPendingExtensions, nextInviteLink] = await Promise.all([
+      const [nextTeam, nextAttendance, nextTasks, nextConference, nextPendingExtensions, nextInviteLink, nextTeamLeaves, nextMyLeaves] = await Promise.all([
         getTeam(teamId, profile.id), getTeamAttendance(teamId, dateKey), getTeamTasks(teamId),
         getConferenceStatus(teamId), getPendingExtensions(teamId).catch(() => []), getInviteLink(teamId).catch(() => ({ inviteLink: "" })),
+        getTeamLeaveRequests(teamId).catch(() => []), getMyLeaveRequests().catch(() => []),
       ]);
       setCurrentUserId(profile.id);
       setTeam(nextTeam);
@@ -92,6 +102,8 @@ export default function TeamDetailsScreen() {
       setConference({ active: nextConference.active, participantCount: nextConference.conference?.participantCount || 0, conferenceId: nextConference.conference?.conferenceId || null });
       setPendingExtensions(nextPendingExtensions);
       setInviteLink(nextInviteLink.inviteLink || "");
+      setLeaveRequests(nextTeamLeaves);
+      setMyLeaveRequests(nextMyLeaves);
       setSelectedAssigneeIds((current) => current.length ? current.filter((id) => nextTeam.members.some((m) => m.id === id)) : [profile.id]);
       setError(null);
     } catch (err) {
@@ -107,6 +119,30 @@ export default function TeamDetailsScreen() {
       if (nextMode === "in") await punchIn(teamId, getDateKey()); else await punchOut(teamId, getDateKey());
       await loadTeamWorkspace(true);
     } catch (err) { Alert.alert("Attendance update failed", err instanceof Error ? err.message : "Unknown error"); }
+  }
+
+  async function handleRequestLeave() {
+    if (!teamId) return;
+    const today = getDateKey();
+    Alert.prompt?.("Leave reason", "Why do you need leave?", async (reason) => {
+      if (!reason?.trim()) return;
+      try {
+        await createLeaveRequest({ teamId, reason: reason.trim(), startDate: today, endDate: today });
+        await loadTeamWorkspace(true);
+        Alert.alert("Done", "Leave request submitted.");
+      } catch (err) {
+        Alert.alert("Error", err instanceof Error ? err.message : "Failed");
+      }
+    }) ?? Alert.alert("Leave", "To request leave, please contact your team admin.");
+  }
+
+  async function handleReviewLeave(leaveId: string, decision: "approve" | "reject") {
+    try {
+      await reviewLeaveRequest(leaveId, decision);
+      await loadTeamWorkspace(true);
+    } catch (err) {
+      Alert.alert("Error", err instanceof Error ? err.message : "Failed");
+    }
   }
 
   async function handleCreateTask() {
@@ -229,23 +265,100 @@ export default function TeamDetailsScreen() {
             )}
 
             {activeSection === "attendance" && (
-              <GlassView style={styles.sectionCard}>
-                <ThemedText type="cardTitle">Attendance</ThemedText>
-                <ThemedText type="body" themeColor="textSecondary">
-                  {myAttendance?.isPunchedIn ? `Punched in - ${Math.floor(myAttendance.timeSpentMs / 3600000)}h` : myAttendance?.onLeave ? "On leave" : "No session"}
-                </ThemedText>
-                <View style={styles.actionRow}>
-                  {!myAttendance?.isPunchedIn ? (
-                    <Pressable onPress={() => handleAttendance("in")} style={[styles.btn, styles.primaryBtn]}>
-                      <ThemedText type="captionBold" style={{ color: "#fff" }}>Punch In</ThemedText>
-                    </Pressable>
-                  ) : (
-                    <Pressable onPress={() => handleAttendance("out")} style={styles.btn}>
-                      <ThemedText type="captionBold">Punch Out</ThemedText>
-                    </Pressable>
-                  )}
-                </View>
-              </GlassView>
+              <View style={styles.stack}>
+                <GlassView style={styles.sectionCard}>
+                  <ThemedText type="cardTitle">My Attendance</ThemedText>
+                  <ThemedText type="body" themeColor="textSecondary">
+                    {myAttendance?.isPunchedIn ? `Punched in - ${Math.floor(myAttendance.timeSpentMs / 3600000)}h ${Math.floor((myAttendance.timeSpentMs % 3600000) / 60000)}m` : myAttendance?.onLeave ? "On leave" : "No session today"}
+                  </ThemedText>
+                  <View style={styles.actionRow}>
+                    {!myAttendance?.isPunchedIn ? (
+                      <Pressable onPress={() => handleAttendance("in")} style={[styles.btn, styles.primaryBtn]}>
+                        <ThemedText type="captionBold" style={{ color: "#fff" }}>Punch In</ThemedText>
+                      </Pressable>
+                    ) : (
+                      <Pressable onPress={() => handleAttendance("out")} style={styles.btn}>
+                        <ThemedText type="captionBold">Punch Out</ThemedText>
+                      </Pressable>
+                    )}
+                  </View>
+                </GlassView>
+
+                {attendance && attendance.records.length > 0 ? (
+                  <GlassView style={styles.sectionCard}>
+                    <ThemedText type="cardTitle">Team Board — {attendance.dateKey}</ThemedText>
+                    {attendance.records.map((record) => (
+                      <View key={record.user.id} style={styles.attendanceRow}>
+                        <View style={styles.attendanceUser}>
+                          <View style={[styles.attendanceDot, {
+                            backgroundColor: record.isPunchedIn ? "#2f9d61" : record.onLeave ? Brand.warning : theme.divider,
+                          }]} />
+                          <View style={{ flex: 1 }}>
+                            <ThemedText type="body">
+                              {record.user.name}{record.user.id === currentUserId ? " (You)" : ""}
+                            </ThemedText>
+                            <ThemedText type="caption" themeColor="textSecondary">
+                              {record.isPunchedIn
+                                ? `In since ${new Date(record.punchInAt!).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} · ${Math.floor(record.timeSpentMs / 3600000)}h ${Math.floor((record.timeSpentMs % 3600000) / 60000)}m`
+                                : record.onLeave
+                                  ? "On leave"
+                                  : record.punchOutAt
+                                    ? `Left at ${new Date(record.punchOutAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} · ${Math.floor(record.timeSpentMs / 3600000)}h`
+                                    : "Not checked in"}
+                            </ThemedText>
+                          </View>
+                          <ThemedText type="smallBold" style={{
+                            color: record.isPunchedIn ? "#2f9d61" : record.onLeave ? Brand.warning : theme.textSecondary,
+                          }}>
+                            {record.isPunchedIn ? "ACTIVE" : record.onLeave ? "LEAVE" : "AWAY"}
+                          </ThemedText>
+                        </View>
+                      </View>
+                    ))}
+                  </GlassView>
+                ) : null}
+
+                {myLeaveRequests.length > 0 ? (
+                  <GlassView style={styles.sectionCard}>
+                    <ThemedText type="cardTitle">My Leave Requests</ThemedText>
+                    {myLeaveRequests.slice(0, 3).map((lr) => (
+                      <View key={lr.id} style={styles.leaveRow}>
+                        <View style={{ flex: 1 }}>
+                          <ThemedText type="body">{lr.reason || "Leave"}</ThemedText>
+                          <ThemedText type="caption" themeColor="textSecondary">{lr.startDate} · {lr.status}</ThemedText>
+                        </View>
+                        <ThemedText type="smallBold" style={{
+                          color: lr.status === "approved" ? "#2f9d61" : lr.status === "rejected" ? "#d94b4b" : Brand.warning,
+                        }}>
+                          {lr.status.toUpperCase()}
+                        </ThemedText>
+                      </View>
+                    ))}
+                  </GlassView>
+                ) : null}
+
+                {canReviewJoinRequests && leaveRequests.filter((lr) => lr.status === "pending").length > 0 ? (
+                  <GlassView style={styles.sectionCard}>
+                    <ThemedText type="cardTitle">Pending Leave Requests</ThemedText>
+                    {leaveRequests.filter((lr) => lr.status === "pending").map((lr) => (
+                      <View key={lr.id} style={styles.leaveRow}>
+                        <View style={{ flex: 1 }}>
+                          <ThemedText type="body">{lr.reason || "Leave"}</ThemedText>
+                          <ThemedText type="caption" themeColor="textSecondary">{lr.startDate}</ThemedText>
+                        </View>
+                        <View style={styles.actionRow}>
+                          <Pressable onPress={() => void handleReviewLeave(lr.id, "approve")} style={[styles.btn, styles.primaryBtn]}>
+                            <ThemedText type="captionBold" style={{ color: "#fff" }}>Approve</ThemedText>
+                          </Pressable>
+                          <Pressable onPress={() => void handleReviewLeave(lr.id, "reject")} style={styles.btn}>
+                            <ThemedText type="captionBold">Reject</ThemedText>
+                          </Pressable>
+                        </View>
+                      </View>
+                    ))}
+                  </GlassView>
+                ) : null}
+              </View>
             )}
 
             {activeSection === "tasks" && (
@@ -411,4 +524,8 @@ const styles = StyleSheet.create({
   taskCard: { padding: Spacing.three, borderRadius: 14, gap: Spacing.two },
   taskTop: { flexDirection: "row", alignItems: "center", gap: Spacing.two },
   emptyCard: { padding: Spacing.four, borderRadius: 16, gap: Spacing.one },
+  attendanceRow: { paddingVertical: Spacing.two, borderBottomWidth: 1, borderBottomColor: "rgba(128,128,128,0.15)" },
+  attendanceUser: { flexDirection: "row", alignItems: "center", gap: Spacing.two },
+  attendanceDot: { width: 10, height: 10, borderRadius: 999 },
+  leaveRow: { flexDirection: "row", alignItems: "center", gap: Spacing.two, paddingVertical: Spacing.two, borderBottomWidth: 1, borderBottomColor: "rgba(128,128,128,0.15)" },
 });

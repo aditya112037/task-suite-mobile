@@ -13,6 +13,8 @@ export default function RootLayout() {
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="join/[teamId]" />
+            <Stack.Screen name="task-detail" />
+            <Stack.Screen name="notifications" />
           </Stack>
         </AuthProvider>
       </ThemeProvider>

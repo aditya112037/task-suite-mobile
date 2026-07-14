@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
 import { GlassView } from "expo-glass-effect";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 
 import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
 import { Brand, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/services/auth-context";
-import { getProfile, type ProfileSummary } from "@/services/profile";
+import { getProfile, updateProfilePhoto, type ProfileSummary } from "@/services/profile";
 import { useThemePreset } from "@/services/theme-context";
 
 export default function ProfileScreen() {
@@ -19,6 +20,7 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const completionRate = useMemo(() => {
     if (!profile?.progress.personalTotalTasks) return 0;
@@ -45,9 +47,45 @@ export default function ProfileScreen() {
     return () => clearTimeout(timer);
   }, [loadProfile]);
 
+  async function handlePickPhoto() {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.6,
+      base64: true,
+    });
+
+    if (result.canceled || !result.assets?.[0]?.base64) return;
+
+    setUploadingPhoto(true);
+    try {
+      const base64DataUrl = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      await updateProfilePhoto(base64DataUrl);
+      await loadProfile(true);
+      Alert.alert("Done", "Profile photo updated.");
+    } catch (err) {
+      Alert.alert("Error", err instanceof Error ? err.message : "Failed to update photo");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
   return (
     <ScreenShell refreshing={refreshing} onRefresh={() => loadProfile(true)}>
       <View style={styles.container}>
+        <Pressable onPress={handlePickPhoto} style={styles.avatarSection}>
+          <View style={[styles.avatarCircle, { backgroundColor: theme.backgroundElement, borderColor: theme.primary }]}>
+            {uploadingPhoto ? (
+              <ActivityIndicator size="small" color={theme.primary} />
+            ) : profile?.photo ? (
+              <ThemedText style={styles.avatarText}>{profile.name?.[0]?.toUpperCase() || "U"}</ThemedText>
+            ) : (
+              <ThemedText style={styles.avatarText}>{profile?.name?.[0]?.toUpperCase() || "☆"}</ThemedText>
+            )}
+          </View>
+          <ThemedText type="small" themeColor="textSecondary">Tap to change photo</ThemedText>
+        </Pressable>
         <Pressable onPress={() => router.push("/")} style={styles.nameLink}>
           <ThemedText type="hero">{profile?.name || "Profile"}</ThemedText>
         </Pressable>
@@ -148,9 +186,26 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     gap: Spacing.three,
+    alignItems: "center",
+  },
+  avatarSection: {
+    alignItems: "center",
+    gap: Spacing.one,
+  },
+  avatarCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 999,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: {
+    fontSize: 32,
+    fontWeight: "700",
   },
   nameLink: {
-    alignSelf: "flex-start",
+    alignSelf: "center",
   },
   loadingWrap: {
     paddingVertical: Spacing.five,

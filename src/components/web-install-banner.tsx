@@ -54,8 +54,10 @@ export function WebInstallBanner() {
   }
 
   async function handleInstall() {
-    await promptEvent.prompt();
-    const choice = await promptEvent.userChoice;
+    const evt = promptEvent;
+    if (!evt) return;
+    await evt.prompt();
+    const choice = await evt.userChoice;
     setPromptEvent(null);
     setVisible(false);
 

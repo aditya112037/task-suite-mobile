@@ -295,7 +295,7 @@ export default function HomeIntentScreen() {
                   key={task.id}
                   label={task.title}
                   meta={formatDateLabel(task.dueDate)}
-                  onPress={() => router.push("/remote-work")}
+                  onPress={() => router.push("/calendar")}
                 />
               ))
             ) : (
@@ -313,7 +313,7 @@ export default function HomeIntentScreen() {
                   key={task.id}
                   label={task.title}
                   meta={formatDateLabel(task.dueDate)}
-                  onPress={() => router.push("/remote-work")}
+                  onPress={() => router.push({ pathname: "/calendar", params: { focus: "upcoming" } })}
                 />
               ))
             ) : (
@@ -444,7 +444,7 @@ function WidgetCard({
       ]}>
       <View style={styles.widgetHeader}>
         <View style={[styles.widgetIcon, { backgroundColor: `${accent}22` }]}>
-          <SymbolView name={icon} size={16} tintColor={accent} />
+           <SymbolView name={icon as any} size={16} tintColor={accent} />
         </View>
         <ThemedText type="cardTitle">{title}</ThemedText>
       </View>

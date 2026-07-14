@@ -210,7 +210,7 @@ function ShortcutChip({
           borderColor: theme.cardBorder,
         },
       ]}>
-      <SymbolView name={icon} size={15} tintColor={theme.primary} />
+      <SymbolView name={icon as any} size={15} tintColor={theme.primary} />
       <ThemedText type="captionBold">{label}</ThemedText>
     </Pressable>
   );
@@ -218,7 +218,7 @@ function ShortcutChip({
 
 const styles = StyleSheet.create({
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(3, 8, 15, 0.24)",
   },
   anchor: {

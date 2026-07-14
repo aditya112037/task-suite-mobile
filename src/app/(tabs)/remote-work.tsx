@@ -66,13 +66,22 @@ export default function MyTasksScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterKey>(initialFilter);
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const handledIntentRef = useRef("");
 
   const selectionMode = selectedIds.length > 0;
 
   const visibleTasks = useMemo(() => {
-    const filtered = filter === "all" ? tasks : tasks.filter((task) => task.status === filter);
+    let filtered = filter === "all" ? tasks : tasks.filter((task) => task.status === filter);
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      filtered = filtered.filter(
+        (task) =>
+          task.title.toLowerCase().includes(q) ||
+          task.description.toLowerCase().includes(q)
+      );
+    }
     return [...filtered].sort((left, right) => {
       const urgencyOrder = { overdue: 0, soon: 1 };
       const leftUrgency = getTaskUrgency(left);
@@ -84,7 +93,7 @@ export default function MyTasksScreen() {
       const leftTime = left.updatedAt ? new Date(left.updatedAt).getTime() : 0;
       return rightTime - leftTime;
     });
-  }, [filter, tasks]);
+  }, [filter, tasks, searchQuery]);
 
   const taskStats = useMemo(
     () => ({
@@ -260,15 +269,7 @@ export default function MyTasksScreen() {
   }
 
   function openTask(task: PersonalTask) {
-    Alert.alert(task.title, "Choose the next move.", [
-      task.status === "todo"
-        ? { text: "Start", onPress: () => void handleProgress(task, "in-progress") }
-        : { text: "Snooze", onPress: () => void handleSnooze(task) },
-      task.status !== "completed"
-        ? { text: "Complete", onPress: () => void handleProgress(task, "completed") }
-        : { text: "Close" },
-      { text: "Cancel", style: "cancel" },
-    ]);
+    router.push({ pathname: "/task-detail" as never, params: { taskId: task.id } } as never);
   }
 
   return (
@@ -356,6 +357,24 @@ export default function MyTasksScreen() {
             </GlassView>
           </Animated.View>
         ) : null}
+
+        <Animated.View entering={FadeInDown.delay(80).duration(260)} style={styles.searchRow}>
+          <View style={[styles.searchShell, { backgroundColor: theme.backgroundElement, borderColor: theme.cardBorder }]}>
+            <SymbolView name={{ ios: "magnifyingglass", android: "search" }} size={16} tintColor={theme.textSecondary} />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search tasks..."
+              placeholderTextColor={theme.textSecondary}
+              style={[styles.searchInput, { color: theme.text }]}
+            />
+            {searchQuery.length > 0 ? (
+              <Pressable onPress={() => setSearchQuery("")}>
+                <SymbolView name={{ ios: "xmark.circle.fill", android: "close" }} size={16} tintColor={theme.textSecondary} />
+              </Pressable>
+            ) : null}
+          </View>
+        </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(120).duration(260)} style={styles.filterRow}>
           {FILTERS.map((item) => {
@@ -562,6 +581,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.two,
+  },
+  searchRow: {
+    gap: Spacing.one,
+  },
+  searchShell: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one,
+    gap: Spacing.two,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: Spacing.one,
   },
   progressTrack: {
     height: 6,
