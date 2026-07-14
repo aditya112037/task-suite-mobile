@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { GlassView } from "expo-glass-effect";
 import {
@@ -47,14 +48,26 @@ function getTomorrowIso(base?: string | null) {
 export default function MyTasksScreen() {
   const theme = useTheme();
   const { signOut } = useAuth();
+  const params = useLocalSearchParams<{
+    intent?: string;
+    title?: string;
+    dueDate?: string;
+    autocreate?: string;
+    filter?: FilterKey;
+  }>();
+  const initialFilter =
+    typeof params.filter === "string" && FILTERS.includes(params.filter as FilterKey)
+      ? (params.filter as FilterKey)
+      : "all";
   const [tasks, setTasks] = useState<PersonalTask[]>([]);
   const [title, setTitle] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<FilterKey>("all");
+  const [filter, setFilter] = useState<FilterKey>(initialFilter);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const handledIntentRef = useRef("");
 
   const selectionMode = selectedIds.length > 0;
 
@@ -116,6 +129,47 @@ export default function MyTasksScreen() {
     const timer = setTimeout(() => void loadTasks(), 0);
     return () => clearTimeout(timer);
   }, [loadTasks]);
+
+  useEffect(() => {
+    if (params.intent !== "create-task") return;
+
+    const titleFromIntent = typeof params.title === "string" ? params.title.trim() : "";
+    const intentKey = `${params.intent}:${titleFromIntent}:${params.dueDate || ""}:${params.autocreate || ""}`;
+    if (!intentKey || handledIntentRef.current === intentKey) return;
+
+    handledIntentRef.current = intentKey;
+
+    if (!titleFromIntent) {
+      return;
+    }
+
+    const applyIntent = async () => {
+      if (params.autocreate === "1") {
+        setSaving(true);
+        try {
+          const createdTask = await createTask({
+            title: titleFromIntent,
+            dueDate: params.dueDate || undefined,
+            workspace: "work",
+          });
+          setTasks((currentTasks) => [createdTask, ...currentTasks]);
+          setTitle("");
+          setError(null);
+          router.replace("/remote-work");
+        } catch (err) {
+          Alert.alert("Could not create task", err instanceof Error ? err.message : "Unknown error");
+          setTitle(titleFromIntent);
+        } finally {
+          setSaving(false);
+        }
+        return;
+      }
+
+      setTitle(titleFromIntent);
+    };
+
+    void applyIntent();
+  }, [params.autocreate, params.dueDate, params.intent, params.title]);
 
   async function handleCreateTask() {
     const trimmedTitle = title.trim();

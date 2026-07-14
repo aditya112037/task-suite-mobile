@@ -1,5 +1,4 @@
 import { Href } from "expo-router";
-import { openBrowserAsync, WebBrowserPresentationStyle } from "expo-web-browser";
 
 const INTERNAL_HOSTS = new Set([
   "tasksuite.co",
@@ -49,10 +48,4 @@ export function resolveInternalHref(rawHref: string): Href | null {
   }
 
   return null;
-}
-
-export async function openExternalInAppBrowser(href: string) {
-  await openBrowserAsync(href, {
-    presentationStyle: WebBrowserPresentationStyle.AUTOMATIC,
-  });
 }

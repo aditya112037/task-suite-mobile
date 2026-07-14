@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,7 +13,7 @@ import {
 import { GlassView } from "expo-glass-effect";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { ThemedText } from "@/components/themed-text";
 import { Spacing } from "@/constants/theme";
@@ -21,18 +21,39 @@ import { useTheme } from "@/hooks/use-theme";
 import { login, register } from "@/services/auth";
 import { signInWithGoogle } from "@/services/googleAuth";
 import { useAuth } from "@/services/auth-context";
+import { consumePendingIntent } from "@/services/intent-navigation";
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { checkToken } = useAuth();
+  const params = useLocalSearchParams<{ mode?: string }>();
+  const { checkToken, hasToken } = useAuth();
   const safeAreaInsets = useSafeAreaInsets();
   const theme = useTheme();
-  const [isRegister, setIsRegister] = useState(false);
+  const [isRegister, setIsRegister] = useState(params.mode === "register");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const hasRedirectedRef = useRef(false);
+
+  const completeAuthRedirect = useCallback(async () => {
+    hasRedirectedRef.current = true;
+    const pendingIntent = await consumePendingIntent();
+    if (pendingIntent) {
+      router.replace(pendingIntent as never);
+      return;
+    }
+
+    router.replace("/dashboard");
+  }, [router]);
+
+  useEffect(() => {
+    if (!hasToken || hasRedirectedRef.current) return;
+
+    hasRedirectedRef.current = true;
+    void completeAuthRedirect();
+  }, [completeAuthRedirect, hasToken]);
 
   async function handleSubmit() {
     if (!email.trim() || !password.trim()) {
@@ -50,7 +71,7 @@ export default function LoginScreen() {
         : await login(email, password);
       Alert.alert("Success", `Welcome ${user.name}`);
       await checkToken();
-      router.replace("/dashboard");
+      await completeAuthRedirect();
     } catch (error: any) {
       Alert.alert("Error", error.message);
     } finally {
@@ -64,7 +85,7 @@ export default function LoginScreen() {
       const user = await signInWithGoogle();
       Alert.alert("Success", `Welcome ${user.name}`);
       await checkToken();
-      router.replace("/dashboard");
+      await completeAuthRedirect();
     } catch (error: any) {
       Alert.alert("Error", error.message);
     } finally {

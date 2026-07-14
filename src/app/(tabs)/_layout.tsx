@@ -4,7 +4,6 @@ import { DarkTheme, DefaultTheme, Redirect, ThemeProvider } from "expo-router";
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import AppTabs from "@/components/app-tabs";
 import { FloatingQuickActions } from "@/components/floating-quick-actions";
-import { WebInstallBanner } from "@/components/web-install-banner";
 import { useAuth } from "@/services/auth-context";
 
 export default function TabsLayout() {
@@ -28,7 +27,6 @@ export default function TabsLayout() {
       <AnimatedSplashOverlay />
       <AppTabs />
       <FloatingQuickActions />
-      <WebInstallBanner />
     </ThemeProvider>
   );
 }

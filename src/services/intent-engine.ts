@@ -1,26 +1,11 @@
-export type IntentWorkflow = "tasks" | "teams" | "conference" | "plan";
-
-export type IntentAction =
-  | "create_task"
-  | "create_team"
-  | "join_team"
-  | "members"
-  | "team_tasks"
-  | "extensions"
-  | "team_settings"
-  | "conference_join"
-  | "conference_create"
-  | "attendance"
-  | "punch_in"
-  | "punch_out";
+import type { IntentTarget } from "@/services/intent-navigation";
 
 type IntentRoute = {
   matcher: string[];
   feedback: string;
-  workflow?: IntentWorkflow;
-  action?: IntentAction;
-  path?: string;
+  target?: IntentTarget;
   protected?: boolean;
+  responseOnly?: boolean;
 };
 
 type ResolveResult = {
@@ -30,32 +15,144 @@ type ResolveResult = {
 } | null;
 
 const ROUTES: IntentRoute[] = [
-  { matcher: ["login", "log in", "sign in", "signin", "register", "sign up", "signup", "create account"], path: "/login", protected: false, feedback: "Opening sign in." },
-  { matcher: ["home", "dashboard", "overview", "workspace", "progress"], path: "/dashboard", protected: true, feedback: "Opening your dashboard." },
-  { matcher: ["profile", "my profile", "account"], path: "/profile", protected: true, feedback: "Opening your profile." },
-  { matcher: ["task", "tasks", "todo", "todos", "my tasks", "personal tasks"], workflow: "tasks", feedback: "Choose what you want to do with tasks." },
-  { matcher: ["create task", "create a task", "new task", "add task"], action: "create_task", feedback: "Starting a task flow." },
-  { matcher: ["assigned tasks", "assigned task", "my assigned tasks"], path: "/dashboard", protected: true, feedback: "Opening assigned work." },
-  { matcher: ["teams", "team", "team workspace", "workspace teams", "group"], workflow: "teams", feedback: "Choose how you want to work with teams." },
-  { matcher: ["create team", "start a team", "new team"], action: "create_team", feedback: "Starting the team creation flow." },
-  { matcher: ["join team", "join workspace", "team invite", "invite"], action: "join_team", feedback: "Starting the team join flow." },
-  { matcher: ["members", "team members", "people", "teammates", "staff"], action: "members", feedback: "Choose the team members workspace." },
-  { matcher: ["team tasks", "team task", "tasks for team"], action: "team_tasks", feedback: "Choose the team task workspace." },
-  { matcher: ["extensions", "extension requests", "view extensions"], action: "extensions", feedback: "Choose the team extension workspace." },
-  { matcher: ["team settings", "team configuration", "team config"], action: "team_settings", feedback: "Choose the team settings workspace." },
-  { matcher: ["conference", "meeting", "call", "team conference"], workflow: "conference", feedback: "Choose whether you want to create or join a conference." },
-  { matcher: ["join conference", "join meeting"], action: "conference_join", feedback: "Choose the team conference you want to join." },
-  { matcher: ["create conference", "start conference", "start meeting"], action: "conference_create", feedback: "Choose the team conference you want to start." },
-  { matcher: ["attendance", "team attendance", "attendance board"], action: "attendance", feedback: "Opening attendance." },
-  { matcher: ["punch in", "check in", "start shift"], action: "punch_in", feedback: "Opening attendance so you can punch in." },
-  { matcher: ["punch out", "check out", "end shift"], action: "punch_out", feedback: "Opening attendance so you can punch out." },
-  { matcher: ["plan my day", "daily plan", "plan"], workflow: "plan", feedback: "Choose what you want to focus on in your day plan." },
-  { matcher: ["calendar", "schedule", "add event", "add note"], path: "https://tasksuite.co/app?view=calendar", protected: true, feedback: "Opening calendar on the web workspace." },
-  { matcher: ["mail", "messages", "inbox", "compose mail"], path: "https://tasksuite.co/inbox", protected: true, feedback: "Opening mail on the web workspace." },
-  { matcher: ["insights", "journal", "create insight"], path: "https://tasksuite.co/insights", protected: true, feedback: "Opening insights on the web workspace." },
-  { matcher: ["reports", "report"], path: "https://tasksuite.co/reports", protected: true, feedback: "Opening reports on the web workspace." },
-  { matcher: ["pricing", "plans", "upgrade"], path: "https://tasksuite.co/pricing", protected: false, feedback: "Opening pricing." },
-  { matcher: ["contact", "support", "help"], path: "https://tasksuite.co/contact", protected: false, feedback: "Opening contact." },
+  {
+    matcher: ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"],
+    feedback: "Hey. I can open tasks, calendar, teams, profile, or capture a task for you.",
+    responseOnly: true,
+    protected: false,
+  },
+  {
+    matcher: ["thanks", "thank you"],
+    feedback: "Anytime. Try tasks, calendar, teams, or tell me what to create.",
+    responseOnly: true,
+    protected: false,
+  },
+  {
+    matcher: ["login", "log in", "sign in", "signin"],
+    target: { pathname: "/(auth)/login" },
+    protected: false,
+    feedback: "Opening sign in.",
+  },
+  {
+    matcher: ["register", "sign up", "signup", "create account"],
+    target: { pathname: "/(auth)/login", params: { mode: "register" } },
+    protected: false,
+    feedback: "Opening account creation.",
+  },
+  {
+    matcher: ["home", "dashboard", "overview", "workspace", "progress"],
+    target: { pathname: "/dashboard" },
+    protected: true,
+    feedback: "Opening your dashboard.",
+  },
+  {
+    matcher: ["calendar", "agenda", "today", "today agenda", "schedule", "planner"],
+    target: { pathname: "/dashboard", params: { focus: "agenda" } },
+    protected: true,
+    feedback: "Opening your agenda.",
+  },
+  {
+    matcher: ["due soon", "deadlines", "upcoming", "upcoming work"],
+    target: { pathname: "/dashboard", params: { focus: "due-soon" } },
+    protected: true,
+    feedback: "Opening work due soon.",
+  },
+  {
+    matcher: ["profile", "my profile", "account"],
+    target: { pathname: "/profile" },
+    protected: true,
+    feedback: "Opening your profile.",
+  },
+  {
+    matcher: ["task", "tasks", "todo", "todos", "my tasks", "personal tasks"],
+    target: { pathname: "/remote-work" },
+    protected: true,
+    feedback: "Opening your tasks.",
+  },
+  {
+    matcher: ["create task", "create a task", "new task", "add task"],
+    target: { pathname: "/remote-work", params: { intent: "create-task" } },
+    protected: true,
+    feedback: "Opening task capture.",
+  },
+  {
+    matcher: ["assigned tasks", "assigned task", "my assigned tasks"],
+    target: { pathname: "/dashboard", params: { focus: "assigned" } },
+    protected: true,
+    feedback: "Opening assigned work.",
+  },
+  {
+    matcher: ["teams", "team", "team workspace", "workspace teams", "group"],
+    target: { pathname: "/teams" },
+    protected: true,
+    feedback: "Opening your teams.",
+  },
+  {
+    matcher: ["create team", "start a team", "new team"],
+    target: { pathname: "/teams", params: { action: "create" } },
+    protected: true,
+    feedback: "Opening team creation.",
+  },
+  {
+    matcher: ["join team", "join workspace", "team invite", "invite"],
+    target: { pathname: "/teams", params: { action: "join" } },
+    protected: true,
+    feedback: "Opening team join flow.",
+  },
+  {
+    matcher: ["members", "team members", "people", "teammates", "staff"],
+    target: { pathname: "/teams", params: { section: "members" } },
+    protected: true,
+    feedback: "Opening team members.",
+  },
+  {
+    matcher: ["team tasks", "team task", "tasks for team"],
+    target: { pathname: "/teams", params: { section: "tasks" } },
+    protected: true,
+    feedback: "Opening team tasks.",
+  },
+  {
+    matcher: ["extensions", "extension requests", "view extensions"],
+    target: { pathname: "/teams", params: { section: "extensions" } },
+    protected: true,
+    feedback: "Opening extension requests.",
+  },
+  {
+    matcher: ["team settings", "team configuration", "team config"],
+    target: { pathname: "/teams", params: { section: "settings" } },
+    protected: true,
+    feedback: "Opening team settings.",
+  },
+  {
+    matcher: ["attendance", "team attendance", "attendance board"],
+    target: { pathname: "/teams", params: { section: "attendance" } },
+    protected: true,
+    feedback: "Opening attendance.",
+  },
+  {
+    matcher: ["punch in", "check in", "start shift"],
+    target: { pathname: "/teams", params: { section: "attendance" } },
+    protected: true,
+    feedback: "Opening attendance so you can punch in.",
+  },
+  {
+    matcher: ["punch out", "check out", "end shift"],
+    target: { pathname: "/teams", params: { section: "attendance" } },
+    protected: true,
+    feedback: "Opening attendance so you can punch out.",
+  },
+  {
+    matcher: ["conference", "meetings", "meeting", "call", "video call", "start conference"],
+    target: { pathname: "/teams", params: { section: "conference" } },
+    protected: true,
+    feedback: "Opening team conference.",
+  },
+  {
+    matcher: ["plan my day", "daily plan", "plan"],
+    target: { pathname: "/dashboard", params: { focus: "agenda" } },
+    protected: true,
+    feedback: "Opening your day plan.",
+  },
 ];
 
 export function normalizeCommand(value: string) {
@@ -64,6 +161,58 @@ export function normalizeCommand(value: string) {
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function buildDueDate(day: "today" | "tomorrow") {
+  const date = new Date();
+  if (day === "tomorrow") {
+    date.setDate(date.getDate() + 1);
+  }
+  date.setHours(9, 0, 0, 0);
+  return date.toISOString();
+}
+
+function extractTaskIntent(rawInput: string) {
+  const normalized = normalizeCommand(rawInput);
+  const shouldCapture =
+    normalized.startsWith("create task") ||
+    normalized.startsWith("add task") ||
+    normalized.startsWith("new task") ||
+    normalized.startsWith("remind me") ||
+    normalized.startsWith("remember to");
+
+  if (!shouldCapture) return null;
+
+  const dueDate = normalized.includes("tomorrow")
+    ? buildDueDate("tomorrow")
+    : normalized.includes("today")
+      ? buildDueDate("today")
+      : undefined;
+
+  const title = rawInput
+    .replace(/^(please\s+)?(create|add|new)\s+(a\s+)?task\s*/i, "")
+    .replace(/^(please\s+)?(remind me|remember to)\s+/i, "")
+    .replace(/\b(today|tomorrow)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return {
+    route: {
+      matcher: [],
+      feedback: title ? "Capturing that task natively." : "Opening task capture.",
+      target: {
+        pathname: "/remote-work",
+        params: {
+          intent: "create-task",
+          ...(title ? { title } : {}),
+          ...(dueDate ? { dueDate, autocreate: "1" } : {}),
+        },
+      },
+      protected: true,
+    } satisfies IntentRoute,
+    score: title ? 110 : 95,
+    exact: false,
+  };
 }
 
 export function getIntentPrompts(options: {
@@ -75,26 +224,31 @@ export function getIntentPrompts(options: {
 
   return [
     ...(!signedIn ? ["Login", "Create account"] : []),
+    "Hi",
+    "Calendar",
     "Plan my day",
     "My tasks",
     "Create task",
+    "Due soon",
     "Teams",
     "Create team",
     "Join team",
     ...(hasTeamAccess ? ["Attendance", "Team tasks", "Team members", "Conference"] : []),
-    ...(hasAdminTeamAccess ? ["Extensions", "Team settings", "Start conference"] : []),
+    ...(hasAdminTeamAccess ? ["Extensions", "Team settings"] : []),
     "Profile",
-    "Calendar",
-    "Inbox",
-    "Insights",
   ];
 }
 
 export function getIntentSuggestions(input: string, prompts: string[]) {
   const normalized = normalizeCommand(input);
-  if (!normalized) return prompts.slice(0, 8);
+  if (!normalized) return prompts.slice(0, 10);
 
-  return prompts.filter((prompt) => normalizeCommand(prompt).includes(normalized)).slice(0, 6);
+  return prompts
+    .filter((prompt) => {
+      const normalizedPrompt = normalizeCommand(prompt);
+      return normalizedPrompt.includes(normalized) || normalized.includes(normalizedPrompt);
+    })
+    .slice(0, 8);
 }
 
 export function resolveIntentCommand(input: string): ResolveResult {
@@ -102,30 +256,41 @@ export function resolveIntentCommand(input: string): ResolveResult {
   if (!value) return null;
 
   const inputTokens = value.split(" ");
-  const scored = ROUTES.map((route) => {
-    let bestScore = 0;
-    let exact = false;
+  const taskIntent = extractTaskIntent(input);
 
-    route.matcher.forEach((phrase) => {
-      const normalizedPhrase = normalizeCommand(phrase);
-      const phraseTokens = normalizedPhrase.split(" ");
+  const topRoute = ROUTES
+    .map((route) => {
+      let bestScore = 0;
+      let exact = false;
 
-      if (value === normalizedPhrase) {
-        bestScore = Math.max(bestScore, 120);
-        exact = true;
-        return;
-      }
+      route.matcher.forEach((phrase) => {
+        const normalizedPhrase = normalizeCommand(phrase);
+        const phraseTokens = normalizedPhrase.split(" ");
 
-      if (value.includes(normalizedPhrase) || normalizedPhrase.includes(value)) {
-        bestScore = Math.max(bestScore, 90);
-      }
+        if (value === normalizedPhrase) {
+          bestScore = Math.max(bestScore, 120);
+          exact = true;
+          return;
+        }
 
-      const tokenScore = phraseTokens.reduce((sum, token) => sum + (inputTokens.includes(token) ? 12 : 0), 0);
-      bestScore = Math.max(bestScore, tokenScore);
-    });
+        if (value.includes(normalizedPhrase) || normalizedPhrase.includes(value)) {
+          bestScore = Math.max(bestScore, 90);
+        }
 
-    return { route, score: bestScore, exact };
-  }).sort((left, right) => right.score - left.score)[0];
+        const tokenScore = phraseTokens.reduce(
+          (sum, token) => sum + (inputTokens.includes(token) ? 12 : 0),
+          0
+        );
+        bestScore = Math.max(bestScore, tokenScore);
+      });
 
-  return scored && scored.score >= 12 ? scored : null;
+      return { route, score: bestScore, exact };
+    })
+    .sort((left, right) => right.score - left.score)[0];
+
+  if (taskIntent && (!topRoute || taskIntent.score >= topRoute.score)) {
+    return taskIntent;
+  }
+
+  return topRoute && topRoute.score >= 12 ? topRoute : null;
 }

@@ -8,7 +8,6 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Brand, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
-import { openExternalInAppBrowser } from "@/services/smart-link";
 import { getProfile } from "@/services/profile";
 import {
   approveJoinRequest,
@@ -45,10 +44,9 @@ function isTeamSection(value: string | undefined): value is TeamSection {
 }
 
 export default function TeamDetailsScreen() {
-  const params = useLocalSearchParams<{ teamId: string; section?: string; mode?: string }>();
+  const params = useLocalSearchParams<{ teamId: string; section?: string }>();
   const teamId = params.teamId;
   const sectionFromParams = isTeamSection(params.section) ? params.section : "overview";
-  const mode = params.mode || "";
   const theme = useTheme();
   const [team, setTeam] = useState<TeamDetail | null>(null);
   const [attendance, setAttendance] = useState<TeamAttendance | null>(null);
@@ -359,16 +357,9 @@ export default function TeamDetailsScreen() {
                 <ThemedText type="body" themeColor="textSecondary">
                   {conference.active ? `${conference.participantCount} in the room` : "No live room active"}
                 </ThemedText>
-                <View style={styles.actionRow}>
-                  <Pressable onPress={() => openExternalInAppBrowser(`https://tasksuite.co/teams/${teamId}?conference=join`)}
-                    style={[styles.btn, mode === "join" ? styles.primaryBtn : null]}>
-                    <ThemedText type="captionBold" style={mode === "join" ? { color: "#fff" } : undefined}>Join</ThemedText>
-                  </Pressable>
-                  <Pressable onPress={() => openExternalInAppBrowser(`https://tasksuite.co/teams/${teamId}?conference=create`)}
-                    style={[styles.btn, mode === "create" ? styles.primaryBtn : null]}>
-                    <ThemedText type="captionBold" style={mode === "create" ? { color: "#fff" } : undefined}>Host</ThemedText>
-                  </Pressable>
-                </View>
+                <ThemedText type="caption" themeColor="textSecondary">
+                  Conference features are coming soon as a native experience.
+                </ThemedText>
               </GlassView>
             )}
 

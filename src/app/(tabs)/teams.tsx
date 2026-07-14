@@ -22,6 +22,8 @@ import {
 } from "@/services/teams";
 
 const COLOR_OPTIONS = ["#3c87f7", "#f97316", "#10b981", "#e11d48"];
+const TEAM_SECTIONS = ["attendance", "tasks", "members", "extensions", "conference", "settings"] as const;
+type TeamSection = (typeof TEAM_SECTIONS)[number];
 
 function extractInviteCode(value: string) {
   const normalized = value.trim();
@@ -31,9 +33,25 @@ function extractInviteCode(value: string) {
   return normalized.replace(/^\/+|\/+$/g, "");
 }
 
+function isTeamSection(value: string | undefined): value is TeamSection {
+  return TEAM_SECTIONS.includes(value as TeamSection);
+}
+
+function pickTeamForSection(teams: TeamSummary[], section: TeamSection) {
+  if (section === "extensions") {
+    return teams.find((team) => team.isAdmin || team.myPowers.includes("approve_extensions")) || null;
+  }
+
+  if (section === "settings") {
+    return teams.find((team) => team.isAdmin) || null;
+  }
+
+  return teams[0] || null;
+}
+
 export default function TeamsScreen() {
   const theme = useTheme();
-  const { action } = useLocalSearchParams<{ action?: string }>();
+  const { action, section } = useLocalSearchParams<{ action?: string; section?: string }>();
   const { signOut } = useAuth();
   const [teams, setTeams] = useState<TeamSummary[]>([]);
   const [pendingRequests, setPendingRequests] = useState<JoinRequestNotice[]>([]);
@@ -80,6 +98,18 @@ export default function TeamsScreen() {
     const timer = setTimeout(() => void loadTeams(), 0);
     return () => clearTimeout(timer);
   }, [loadTeams]);
+
+  useEffect(() => {
+    if (loading || !isTeamSection(section) || !teams.length) return;
+
+    const candidate = pickTeamForSection(teams, section);
+    if (!candidate) return;
+
+    router.replace({
+      pathname: "/team/[teamId]",
+      params: { teamId: candidate.id, section },
+    });
+  }, [loading, section, teams]);
 
   async function handleCreateTeam() {
     const name = teamName.trim();

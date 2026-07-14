@@ -9,26 +9,25 @@ import { ThemedView } from "@/components/themed-view";
 import { Fonts, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/services/auth-context";
+import { savePendingIntent, type IntentTarget } from "@/services/intent-navigation";
+import { getProfile } from "@/services/profile";
+import { getTeams } from "@/services/teams";
 import {
   getIntentPrompts,
   getIntentSuggestions,
   normalizeCommand,
   resolveIntentCommand,
-  type IntentWorkflow,
 } from "@/services/intent-engine";
-import { openExternalInAppBrowser } from "@/services/smart-link";
-
-type WorkflowState = { key: IntentWorkflow };
 
 export default function HomePage() {
   const theme = useTheme();
   const { hasToken } = useAuth();
-  console.log("[Index] rendered, hasToken:", hasToken);
   const { width, height } = useWindowDimensions();
   const [commandText, setCommandText] = useState("");
   const [commandFeedback, setCommandFeedback] = useState("Search, prompt, and route into the right workspace.");
-  const [workflow, setWorkflow] = useState<WorkflowState | null>(null);
   const [showAllPrompts, setShowAllPrompts] = useState(false);
+  const [hasTeamAccess, setHasTeamAccess] = useState(false);
+  const [hasAdminTeamAccess, setHasAdminTeamAccess] = useState(false);
   const isCompact = height < 780 || width < 380;
   const isShort = height < 720;
   const isTiny = height < 690 || width < 360;
@@ -36,74 +35,81 @@ export default function HomePage() {
 
   const isLoggedIn = hasToken === true;
   const prompts = useMemo(
-    () => getIntentPrompts({ signedIn: isLoggedIn, hasTeamAccess: false, hasAdminTeamAccess: false }),
-    [isLoggedIn]
+    () => getIntentPrompts({ signedIn: isLoggedIn, hasTeamAccess, hasAdminTeamAccess }),
+    [hasAdminTeamAccess, hasTeamAccess, isLoggedIn]
   );
   const suggestions = useMemo(() => getIntentSuggestions(commandText, prompts), [commandText, prompts]);
   const visiblePrompts = showAllPrompts ? prompts : suggestions.length ? suggestions.slice(0, promptLimit) : prompts.slice(0, promptLimit);
   const hiddenPromptCount = Math.max(prompts.length - visiblePrompts.length, 0);
 
-  function requireAuth() {
-    router.push("/(auth)/login");
-  }
+  useEffect(() => {
+    let active = true;
 
-  async function openExternalPath(path: string) {
-    const url = path.startsWith("http") ? path : `https://tasksuite.co${path}`;
-    await openExternalInAppBrowser(url);
+    async function loadIntentCapabilities() {
+      if (!isLoggedIn) {
+        if (!active) return;
+        setHasTeamAccess(false);
+        setHasAdminTeamAccess(false);
+        return;
+      }
+
+      try {
+        const profile = await getProfile();
+        const teams = await getTeams(profile.id);
+
+        if (!active) return;
+
+        setHasTeamAccess(teams.length > 0);
+        setHasAdminTeamAccess(
+          teams.some((team) => team.isAdmin || team.myPowers.includes("approve_extensions"))
+        );
+      } catch {
+        if (!active) return;
+        setHasTeamAccess(false);
+        setHasAdminTeamAccess(false);
+      }
+    }
+
+    void loadIntentCapabilities();
+
+    return () => {
+      active = false;
+    };
+  }, [isLoggedIn]);
+
+  async function openTarget(target: IntentTarget, protectedRoute = false) {
+    if (protectedRoute && !isLoggedIn) {
+      await savePendingIntent(target);
+      router.push("/(auth)/login");
+      return;
+    }
+
+    router.push(target as never);
   }
 
   async function runCommand(rawValue: string) {
     const normalizedValue = normalizeCommand(rawValue);
     if (!normalizedValue) {
-      setWorkflow({ key: "plan" });
-      setCommandFeedback("Choose a starting point below.");
+      setCommandFeedback("Try hi, tasks, calendar, teams, profile, or create task.");
       return;
     }
 
     const routeMatch = resolveIntentCommand(rawValue);
     if (!routeMatch) {
-      setWorkflow({ key: "plan" });
-      setCommandFeedback("Try tasks, teams, calendar, profile, conference, or plan my day.");
+      setCommandFeedback("I couldn't place that yet. Try tasks, calendar, teams, profile, or create task.");
       return;
     }
 
     setCommandFeedback(routeMatch.route.feedback);
 
-    if (
-      routeMatch.route.path === "/login" ||
-      normalizedValue === "login" ||
-      normalizedValue === "sign in" ||
-      normalizedValue === "sign up" ||
-      normalizedValue === "create account"
-    ) {
-      setWorkflow(null);
-      router.push("/(auth)/login");
+    if (routeMatch.route.responseOnly) {
       return;
     }
 
-    if (routeMatch.route.protected && !isLoggedIn) {
-      requireAuth();
+    if (routeMatch.route.target) {
+      await openTarget(routeMatch.route.target, routeMatch.route.protected);
       return;
     }
-
-    if (routeMatch.route.workflow) {
-      setWorkflow({ key: routeMatch.route.workflow });
-      return;
-    }
-
-    if (routeMatch.route.action) {
-      setWorkflow(null);
-      requireAuth();
-      return;
-    }
-
-    setWorkflow(null);
-    const path = routeMatch.route.path;
-    if (path?.startsWith("http")) {
-      await openExternalPath(path);
-      return;
-    }
-    requireAuth();
   }
 
   if (hasToken === null) {
@@ -131,7 +137,7 @@ export default function HomePage() {
           </ThemedView>
 
           <Pressable
-            onPress={() => router.push("/(auth)/login")}
+            onPress={() => router.push(isLoggedIn ? "/profile" : "/(auth)/login")}
             style={[
               styles.avatarButton,
               isCompact ? styles.avatarButtonCompact : null,
@@ -224,11 +230,10 @@ export default function HomePage() {
                 styles.promptChip,
                 isTiny ? styles.promptChipTiny : null,
                 {
-                  backgroundColor: index === 0 && workflow?.key === "plan" ? "rgba(95, 242, 255, 0.12)" : theme.backgroundElement,
+                  backgroundColor: theme.backgroundElement,
                   borderColor: theme.primaryLight,
                 },
               ]}>
-              {index === 0 && workflow?.key === "plan" ? <View style={[styles.promptDot, { backgroundColor: theme.primary }]} /> : null}
               <ThemedText>{prompt}</ThemedText>
             </Pressable>
           ))}
@@ -241,7 +246,7 @@ export default function HomePage() {
         ) : null}
 
         <Pressable
-          onPress={() => (isLoggedIn ? router.push("/dashboard") : requireAuth())}
+          onPress={() => void openTarget({ pathname: "/dashboard" }, true)}
           style={[styles.primaryCta, isTiny ? styles.primaryCtaTiny : null, { backgroundColor: theme.primary }]}>
           <SymbolView name={{ ios: "square.grid.2x2.fill", android: "dashboard" }} size={20} tintColor="#f5f1ea" />
           <ThemedText type="smallBold" style={[styles.primaryCtaText, isCompact ? styles.primaryCtaTextCompact : null]}>
@@ -251,8 +256,7 @@ export default function HomePage() {
 
         <Pressable
           onPress={() => {
-            setWorkflow({ key: "plan" });
-            setCommandFeedback("Choose a starting point below.");
+            setCommandFeedback("Try tasks, calendar, teams, attendance, or create task.");
           }}
           style={[styles.secondaryCta, isTiny ? styles.secondaryCtaTiny : null, { borderColor: theme.cardBorder, backgroundColor: "rgba(255,255,255,0.32)" }]}>
           <ThemedText type="smallBold">Get started</ThemedText>
@@ -264,31 +268,26 @@ export default function HomePage() {
           </ThemedText>
         ) : null}
 
-        {workflow?.key === "plan" ? (
-          <ThemedView
-            style={[
-              styles.workflowPanel,
-              isTiny ? styles.workflowPanelTiny : null,
-              { backgroundColor: theme.backgroundElement, borderColor: theme.cardBorder },
-            ]}>
-            <ThemedText type="smallBold">Choose your lane</ThemedText>
-            <ThemedText themeColor="textSecondary">{commandFeedback}</ThemedText>
-            <ThemedView style={styles.workflowActions}>
-              <Pressable onPress={() => void runCommand("my tasks")} style={[styles.workflowChip, { borderColor: theme.cardBorder }]}>
-                <ThemedText type="smallBold">Tasks</ThemedText>
-              </Pressable>
-              <Pressable onPress={() => void runCommand("teams")} style={[styles.workflowChip, { borderColor: theme.cardBorder }]}>
-                <ThemedText type="smallBold">Teams</ThemedText>
-              </Pressable>
-              <Pressable onPress={() => void runCommand("calendar")} style={[styles.workflowChip, { borderColor: theme.cardBorder }]}>
-                <ThemedText type="smallBold">Calendar</ThemedText>
-              </Pressable>
-              <Pressable onPress={() => router.push("/(auth)/login")} style={[styles.workflowChip, { borderColor: theme.cardBorder }]}>
-                <ThemedText type="smallBold">Sign in</ThemedText>
-              </Pressable>
-            </ThemedView>
+        <ThemedView
+          style={[
+            styles.workflowPanel,
+            isTiny ? styles.workflowPanelTiny : null,
+            { backgroundColor: theme.backgroundElement, borderColor: theme.cardBorder },
+          ]}>
+          <ThemedText type="smallBold">Intent response</ThemedText>
+          <ThemedText themeColor="textSecondary">{commandFeedback}</ThemedText>
+          <ThemedView style={styles.workflowActions}>
+            <Pressable onPress={() => void runCommand("my tasks")} style={[styles.workflowChip, { borderColor: theme.cardBorder }]}>
+              <ThemedText type="smallBold">Tasks</ThemedText>
+            </Pressable>
+            <Pressable onPress={() => void runCommand("calendar")} style={[styles.workflowChip, { borderColor: theme.cardBorder }]}>
+              <ThemedText type="smallBold">Calendar</ThemedText>
+            </Pressable>
+            <Pressable onPress={() => void runCommand("teams")} style={[styles.workflowChip, { borderColor: theme.cardBorder }]}>
+              <ThemedText type="smallBold">Teams</ThemedText>
+            </Pressable>
           </ThemedView>
-        ) : null}
+        </ThemedView>
       </ThemedView>
     </ScreenShell>
   );
@@ -474,11 +473,6 @@ const styles = StyleSheet.create({
   promptChipTiny: {
     paddingHorizontal: 12,
     paddingVertical: 9,
-  },
-  promptDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 999,
   },
   showMoreButton: {
     alignSelf: "center",
