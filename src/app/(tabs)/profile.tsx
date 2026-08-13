@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
 import { GlassView } from "expo-glass-effect";
 import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from "react-native";
-import * as ImagePicker from "expo-image-picker";
 
 import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
@@ -48,13 +47,28 @@ export default function ProfileScreen() {
   }, [loadProfile]);
 
   async function handlePickPhoto() {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.6,
-      base64: true,
-    });
+    let picker: typeof import("expo-image-picker");
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      picker = require("expo-image-picker");
+    } catch {
+      Alert.alert("Unavailable", "Photo picking isn't available on this device yet.");
+      return;
+    }
+
+    let result;
+    try {
+      result = await picker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.6,
+        base64: true,
+      });
+    } catch {
+      Alert.alert("Unavailable", "Photo picking isn't available on this device yet.");
+      return;
+    }
 
     if (result.canceled || !result.assets?.[0]?.base64) return;
 
