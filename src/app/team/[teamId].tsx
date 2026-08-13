@@ -37,8 +37,8 @@ import {
   reviewLeaveRequest,
   type LeaveRequest,
 } from "@/services/leave-requests";
-import { cleanupConference, requestConferenceCreation } from "@/services/conference-socket";
-import { connectSocket, getSocket, initSocket, joinTeamRoom, leaveTeamRoom } from "@/services/socket";
+import { checkConference, cleanupConference, requestConferenceCreation } from "@/services/conference-socket";
+import { connectSocket, getSocket, initSocket, joinTeamRoom, leaveTeamRoom, whenConnected } from "@/services/socket";
 
 const TEAM_SECTIONS = ["overview", "attendance", "tasks", "members", "extensions", "conference", "settings"] as const;
 type TeamSection = (typeof TEAM_SECTIONS)[number];
@@ -143,28 +143,34 @@ export default function TeamDetailsScreen() {
       void loadTeamWorkspace(true);
     };
 
-    const socket = getSocket();
-    if (socket) {
-      socket.on("conference:started", handleStarted);
-      socket.on("conference:ended", handleEnded);
-      socket.on("conference:refresh", handleRefresh);
-      socket.on("conference:participants", (payload: { teamId?: string; participants?: Array<{ socketId: string }> }) => {
-        if (String(payload.teamId) !== String(teamId)) return;
-        setConference((current) =>
-          current.active ? { ...current, participantCount: payload.participants?.length || 0 } : current
-        );
+    const handleParticipants = (payload: { teamId?: string; participants?: Array<{ socketId: string }> }) => {
+      if (String(payload.teamId) !== String(teamId)) return;
+      setConference((current) =>
+        current.active ? { ...current, participantCount: payload.participants?.length || 0 } : current
+      );
+    };
+
+    const cleanups: Array<() => void> = [];
+    whenConnected((connected) => {
+      connected.on("conference:started", handleStarted);
+      connected.on("conference:ended", handleEnded);
+      connected.on("conference:refresh", handleRefresh);
+      connected.on("conference:participants", handleParticipants);
+      connected.on("connect", () => void checkConference(teamId));
+      if (connected.connected) void checkConference(teamId);
+      cleanups.push(() => {
+        connected.off("conference:started", handleStarted);
+        connected.off("conference:ended", handleEnded);
+        connected.off("conference:refresh", handleRefresh);
+        connected.off("conference:participants", handleParticipants);
+        connected.off("connect");
       });
-    }
+    });
 
     return () => {
+      cleanups.forEach((off) => off());
+      cleanups.length = 0;
       leaveTeamRoom(teamId);
-      const current = getSocket();
-      if (current) {
-        current.off("conference:started", handleStarted);
-        current.off("conference:ended", handleEnded);
-        current.off("conference:refresh", handleRefresh);
-        current.off("conference:participants");
-      }
     };
   }, [teamId, loadTeamWorkspace]);
 

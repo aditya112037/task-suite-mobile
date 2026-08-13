@@ -24,7 +24,7 @@ import {
   type ConferenceState,
   type JoinRequest,
 } from "@/services/conference-socket";
-import { connectSocket, getSocket, initSocket, joinTeamRoom, leaveTeamRoom } from "@/services/socket";
+import { connectSocket, getSocket, initSocket, joinTeamRoom, leaveTeamRoom, whenConnected } from "@/services/socket";
 import { getProfile } from "@/services/profile";
 import {
   addWebRTCListener,
@@ -110,14 +110,14 @@ export default function ConferenceRoomScreen() {
   }, [teamId]);
 
   useEffect(() => {
-    const socket = initSocket();
-    socketRef.current = socket;
+    initSocket();
     connectSocket();
     if (teamId) joinTeamRoom(teamId);
 
-    const handleConnected = () => setMySocketId(socket?.id || "");
-    if (socket?.id) setTimeout(() => setMySocketId(socket.id || ""), 0);
-    socket?.on("connect", handleConnected);
+    whenConnected((connected) => {
+      socketRef.current = connected;
+      setMySocketId(connected.id || "");
+    });
 
     const removed = addWebRTCListener((event) => {
       if (event.type === "remote-media") {
@@ -133,7 +133,6 @@ export default function ConferenceRoomScreen() {
 
     return () => {
       removed();
-      socket?.off("connect", handleConnected);
       if (teamId) leaveTeamRoom(teamId);
     };
   }, [teamId]);
