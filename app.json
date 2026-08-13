@@ -8,10 +8,18 @@
     "scheme": "tasksuitemobile",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "infoPlist": {
+        "NSCameraUsageDescription": "TaskSuite uses the camera for video calls in team conferences.",
+        "NSMicrophoneUsageDescription": "TaskSuite uses the microphone for audio in team conferences."
+      }
     },
     "android": {
       "package": "co.tasksuite.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

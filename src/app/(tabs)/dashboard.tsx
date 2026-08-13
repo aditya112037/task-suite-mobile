@@ -309,7 +309,12 @@ export default function HomeIntentScreen() {
             key={meeting.teamId}
             label={meeting.teamName}
             meta={meeting.active ? `${meeting.participantCount} in room now` : "Ready to host when you are"}
-            onPress={() => router.push("/teams")}
+            onPress={() =>
+              router.push({
+                pathname: "/team/[teamId]",
+                params: { teamId: meeting.teamId, section: "conference" },
+              })
+            }
           />
         ))
       ) : (

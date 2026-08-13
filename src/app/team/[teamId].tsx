@@ -37,6 +37,8 @@ import {
   reviewLeaveRequest,
   type LeaveRequest,
 } from "@/services/leave-requests";
+import { cleanupConference, requestConferenceCreation } from "@/services/conference-socket";
+import { connectSocket, getSocket, initSocket, joinTeamRoom, leaveTeamRoom } from "@/services/socket";
 
 const TEAM_SECTIONS = ["overview", "attendance", "tasks", "members", "extensions", "conference", "settings"] as const;
 type TeamSection = (typeof TEAM_SECTIONS)[number];
@@ -66,6 +68,7 @@ export default function TeamDetailsScreen() {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [myLeaveRequests, setMyLeaveRequests] = useState<LeaveRequest[]>([]);
   const [currentUserId, setCurrentUserId] = useState("");
+  const [startingConference, setStartingConference] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [selectedAssigneeIds, setSelectedAssigneeIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,6 +115,76 @@ export default function TeamDetailsScreen() {
   }, [teamId]);
 
   useEffect(() => { const t = setTimeout(() => void loadTeamWorkspace(), 0); return () => clearTimeout(t); }, [loadTeamWorkspace]);
+
+  useEffect(() => {
+    if (!teamId) return;
+    initSocket();
+    connectSocket();
+    joinTeamRoom(teamId);
+
+    const handleStarted = (payload: { conferenceId: string; teamId: string }) => {
+      if (String(payload.teamId) !== String(teamId)) return;
+      setConference((current) =>
+        current.active && current.conferenceId === payload.conferenceId
+          ? current
+          : { active: true, participantCount: 1, conferenceId: payload.conferenceId }
+      );
+      setStartingConference(false);
+    };
+
+    const handleEnded = (payload: { teamId: string }) => {
+      if (String(payload.teamId) !== String(teamId)) return;
+      setConference({ active: false, participantCount: 0, conferenceId: null });
+      setStartingConference(false);
+    };
+
+    const handleRefresh = (payload: { teamId: string }) => {
+      if (String(payload.teamId) !== String(teamId)) return;
+      void loadTeamWorkspace(true);
+    };
+
+    const socket = getSocket();
+    if (socket) {
+      socket.on("conference:started", handleStarted);
+      socket.on("conference:ended", handleEnded);
+      socket.on("conference:refresh", handleRefresh);
+      socket.on("conference:participants", (payload: { teamId?: string; participants?: Array<{ socketId: string }> }) => {
+        if (String(payload.teamId) !== String(teamId)) return;
+        setConference((current) =>
+          current.active ? { ...current, participantCount: payload.participants?.length || 0 } : current
+        );
+      });
+    }
+
+    return () => {
+      leaveTeamRoom(teamId);
+      const current = getSocket();
+      if (current) {
+        current.off("conference:started", handleStarted);
+        current.off("conference:ended", handleEnded);
+        current.off("conference:refresh", handleRefresh);
+        current.off("conference:participants");
+      }
+    };
+  }, [teamId, loadTeamWorkspace]);
+
+  function handleStartConference() {
+    if (!teamId) return;
+    setStartingConference(true);
+    if (!requestConferenceCreation(teamId)) {
+      setStartingConference(false);
+      Alert.alert("Conference", "Could not start a conference right now. Check your connection.");
+    }
+  }
+
+  function openConferenceRoom() {
+    if (!teamId || !conference.conferenceId || !team) return;
+    cleanupConference();
+    router.push({
+      pathname: "/conference/[conferenceId]",
+      params: { conferenceId: conference.conferenceId, teamId, teamName: team.name || "Team conference" },
+    });
+  }
 
   async function handleAttendance(nextMode: "in" | "out") {
     if (!teamId) return;
@@ -465,15 +538,44 @@ export default function TeamDetailsScreen() {
             )}
 
             {activeSection === "conference" && (
-              <GlassView style={styles.sectionCard}>
-                <ThemedText type="cardTitle">Conference</ThemedText>
-                <ThemedText type="body" themeColor="textSecondary">
-                  {conference.active ? `${conference.participantCount} in the room` : "No live room active"}
-                </ThemedText>
-                <ThemedText type="caption" themeColor="textSecondary">
-                  Conference features are coming soon as a native experience.
-                </ThemedText>
-              </GlassView>
+              <View style={styles.stack}>
+                <GlassView style={styles.sectionCard}>
+                  <ThemedText type="cardTitle">Conference</ThemedText>
+                  <View style={styles.conferenceRow}>
+                    <View style={[styles.liveDot, conference.active && styles.liveDotActive]} />
+                    <ThemedText type="body" themeColor={conference.active ? undefined : "textSecondary"}>
+                      {conference.active
+                        ? `${conference.participantCount} in the room now`
+                        : "No live room active"}
+                    </ThemedText>
+                  </View>
+                  <View style={styles.actionRow}>
+                    {conference.active ? (
+                      <Pressable onPress={openConferenceRoom} style={[styles.btn, styles.primaryBtn]}>
+                        <ThemedText type="captionBold" style={{ color: "#fff" }}>Join call</ThemedText>
+                      </Pressable>
+                    ) : startingConference ? (
+                      <Pressable style={[styles.btn, styles.primaryBtn]}>
+                        <ActivityIndicator size="small" color="#fff" />
+                      </Pressable>
+                    ) : team?.myPowers.includes("start_conference") || team?.isAdmin ? (
+                      <Pressable onPress={handleStartConference} style={[styles.btn, styles.primaryBtn]}>
+                        <ThemedText type="captionBold" style={{ color: "#fff" }}>Start conference</ThemedText>
+                      </Pressable>
+                    ) : null}
+                    {conference.active ? (
+                      <Pressable onPress={openConferenceRoom} style={styles.btn}>
+                        <ThemedText type="captionBold">Room preview</ThemedText>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                  {conference.active && !(team?.myPowers.includes("start_conference") || team?.isAdmin) ? (
+                    <ThemedText type="caption" themeColor="textSecondary">
+                      The room is live — join to see who{"'"}s there. Host approval applies.
+                    </ThemedText>
+                  ) : null}
+                </GlassView>
+              </View>
             )}
 
             {activeSection === "settings" && (
@@ -513,6 +615,9 @@ const styles = StyleSheet.create({
   errorCard: { padding: Spacing.three, borderRadius: 16, gap: Spacing.one },
   stack: { gap: Spacing.two },
   sectionCard: { padding: Spacing.three, borderRadius: 16, gap: Spacing.two },
+  conferenceRow: { flexDirection: "row", alignItems: "center", gap: Spacing.two },
+  liveDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#f59e0b" },
+  liveDotActive: { backgroundColor: "#4ade80" },
   ovGrid: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.two },
   ovCard: { padding: Spacing.three, borderRadius: 12, minWidth: "47%", flex: 1 },
   actionRow: { flexDirection: "row", gap: Spacing.two },
