@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View, useWindowDimensions } from "react-native";
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 import { SymbolView } from "expo-symbols";
 
 import { ScreenShell } from "@/components/screen-shell";
@@ -89,7 +89,7 @@ export default function HomePage() {
       return;
     }
 
-    router.push(target as never);
+    router.push(target as Href);
   }
 
   async function runCommand(rawValue: string) {
@@ -165,7 +165,7 @@ export default function HomePage() {
           <View style={styles.headerActions}>
             {isLoggedIn ? (
               <Pressable
-                onPress={() => router.push("/notifications" as never)}
+                onPress={() => router.push("/notifications")}
                 style={[
                   styles.iconButton,
                   isCompact ? styles.iconButtonCompact : null,

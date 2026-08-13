@@ -13,7 +13,7 @@ import {
 import { GlassView } from "expo-glass-effect";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, type Href } from "expo-router";
 
 import { ThemedText } from "@/components/themed-text";
 import { Spacing } from "@/constants/theme";
@@ -41,7 +41,7 @@ export default function LoginScreen() {
     hasRedirectedRef.current = true;
     const pendingIntent = await consumePendingIntent();
     if (pendingIntent) {
-      router.replace(pendingIntent as never);
+      router.replace(pendingIntent as Href);
       return;
     }
 

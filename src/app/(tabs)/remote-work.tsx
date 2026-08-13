@@ -323,7 +323,7 @@ export default function MyTasksScreen() {
   }
 
   function openTask(task: PersonalTask) {
-    router.push({ pathname: "/task-detail" as never, params: { taskId: task.id } } as never);
+    router.push({ pathname: "/task-detail", params: { taskId: task.id } });
   }
 
   return (

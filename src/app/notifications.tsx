@@ -123,7 +123,7 @@ export default function NotificationsScreen() {
     if (item.taskId) {
       router.push({ pathname: "/remote-work" });
     } else if (item.teamId) {
-      router.push({ pathname: "/team/[teamId]" as never, params: { teamId: item.teamId, section: "overview" } } as never);
+      router.push({ pathname: "/team/[teamId]", params: { teamId: item.teamId, section: "overview" } });
     }
   }
 
