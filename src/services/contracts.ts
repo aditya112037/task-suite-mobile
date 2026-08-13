@@ -16,6 +16,14 @@ export type TaskChecklistItem = {
   assignedTo?: UserSummary | null;
 };
 
+export type TaskIntent = {
+  domain: string;
+  subtype: string;
+  confidence: number;
+  entities: { type: string; value: string }[];
+  source: string;
+};
+
 export type PersonalTask = {
   id: string;
   title: string;
@@ -30,6 +38,9 @@ export type PersonalTask = {
   electricBorder: boolean;
   subtasks: TaskChecklistItem[];
   checkpoints: TaskChecklistItem[];
+  intent?: TaskIntent | null;
+  capabilities?: string[];
+  dynamicFields?: Record<string, unknown>;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -251,6 +262,25 @@ export const normalizePersonalTask = (raw: RawRecord): PersonalTask => {
     electricBorder: readBoolean(raw.flags?.electricBorder),
     subtasks,
     checkpoints,
+    intent: raw.intent
+      ? {
+          domain: readString(raw.intent.domain, "work"),
+          subtype: readString(raw.intent.subtype, "work"),
+          confidence: readNumber(raw.intent.confidence),
+          entities: readArray<RawRecord>(raw.intent.entities).map((entity) => ({
+            type: readString(entity.type),
+            value: readString(entity.value),
+          })),
+          source: readString(raw.intent.source, "backend-hybrid-ontology"),
+        }
+      : null,
+    capabilities: readArray<string>(raw.capabilities)
+      .map((capability) => (typeof capability === "string" ? capability : ""))
+      .filter(Boolean),
+    dynamicFields:
+      raw.dynamicFields && typeof raw.dynamicFields === "object"
+        ? (raw.dynamicFields as Record<string, unknown>)
+        : undefined,
     createdAt: readString(raw.createdAt),
     updatedAt: readString(raw.updatedAt),
   };

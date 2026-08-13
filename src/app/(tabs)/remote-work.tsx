@@ -17,11 +17,26 @@ import { SwipeTaskRow } from "@/components/swipe-task-row";
 import { ThemedText } from "@/components/themed-text";
 import { Brand, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
+import { buildTaskCreateInitialValues } from "@/services/domain-intelligence";
 import { useAuth } from "@/services/auth-context";
 import { createTask, deleteTask, getTasks, updateTask, type PersonalTask } from "@/services/tasks";
+import { IntentGuidancePanel, type GuidanceAction } from "@/components/intent-guidance-panel";
 
 const FILTERS = ["all", "todo", "in-progress", "completed"] as const;
 type FilterKey = (typeof FILTERS)[number];
+
+function prepareTaskCreate(text: string) {
+  const prepared = buildTaskCreateInitialValues(text);
+  const cleanTitle = prepared.title
+    .replace(/\b(today|tomorrow|tonight|this evening|eod)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return {
+    ...prepared,
+    title: cleanTitle || prepared.title,
+    dueDate: prepared.dueDate || null,
+  };
+}
 
 function getTaskUrgency(task: PersonalTask) {
   if (!task.dueDate || task.status === "completed") return null;
@@ -156,10 +171,15 @@ export default function MyTasksScreen() {
       if (params.autocreate === "1") {
         setSaving(true);
         try {
+          const prepared = prepareTaskCreate(titleFromIntent);
           const createdTask = await createTask({
-            title: titleFromIntent,
-            dueDate: params.dueDate || undefined,
-            workspace: "work",
+            title: prepared.title,
+            dueDate: params.dueDate || prepared.dueDate || undefined,
+            priority: prepared.priority,
+            workspace: prepared.workspace,
+            intent: prepared.intent,
+            capabilities: prepared.capabilities,
+            dynamicFields: prepared.dynamicFields,
           });
           setTasks((currentTasks) => [createdTask, ...currentTasks]);
           setTitle("");
@@ -185,7 +205,16 @@ export default function MyTasksScreen() {
     if (!trimmedTitle) return;
     setSaving(true);
     try {
-      const createdTask = await createTask({ title: trimmedTitle, workspace: "work" });
+      const prepared = prepareTaskCreate(trimmedTitle);
+      const createdTask = await createTask({
+        title: prepared.title,
+        dueDate: prepared.dueDate || undefined,
+        priority: prepared.priority,
+        workspace: prepared.workspace,
+        intent: prepared.intent,
+        capabilities: prepared.capabilities,
+        dynamicFields: prepared.dynamicFields,
+      });
       setTasks((currentTasks) => [createdTask, ...currentTasks]);
       setTitle("");
       setError(null);
@@ -193,6 +222,31 @@ export default function MyTasksScreen() {
       Alert.alert("Could not create task", err instanceof Error ? err.message : "Unknown error");
     } finally {
       setSaving(false);
+    }
+  }
+
+  function handleGuidanceAction(action: GuidanceAction) {
+    if (action.type === "draft-title" && typeof action.value === "string") {
+      setTitle(action.value);
+      return;
+    }
+    if (action.type === "focus-domain" && typeof action.domain === "string") {
+      Alert.alert(
+        "Domain guidance",
+        `This looks like a ${action.domain} intent. Add the missing details for a more useful plan.`
+      );
+      return;
+    }
+    if (action.type === "suggest-calendar" || action.type === "open-tasks") {
+      Alert.alert("Guidance", "Type a time hint like tomorrow or tonight and I will schedule it.");
+      return;
+    }
+    if (action.type === "suggest-next-step" && typeof action.value === "string") {
+      Alert.alert("Next step", action.value);
+      return;
+    }
+    if (typeof action.value === "string") {
+      Alert.alert("Guidance", action.value);
     }
   }
 
@@ -325,6 +379,12 @@ export default function MyTasksScreen() {
               )}
             </Pressable>
           </View>
+
+          <IntentGuidancePanel
+            surface="task-form"
+            context={{ title, dueDate: null }}
+            onApply={handleGuidanceAction}
+          />
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(40).duration(260)} style={styles.statGrid}>

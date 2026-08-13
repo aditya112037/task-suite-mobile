@@ -243,28 +243,32 @@ function extractTaskIntent(rawInput: string) {
       ? buildDueDate("today")
       : undefined;
 
+  const wasReminder = /^(please\s+)?(remind me|remember to)\s+/i.test(rawInput);
+
   const title = rawInput
     .replace(/^(please\s+)?(create|add|new|make)\s+(a\s+)?task\s*/i, "")
     .replace(/^(please\s+)?(remind me|remember to|i need to|need to)\s+/i, "")
-    .replace(/\b(today|tomorrow)\b/gi, "")
+    .replace(/\b(today|tomorrow|tonight|this evening|eod)\b/gi, "")
     .replace(/\s+/g, " ")
     .trim();
+
+  const cleanTitle = wasReminder ? title.replace(/^to\s+/i, "").trim() : title;
 
   return {
     route: {
       matcher: [],
-      feedback: title ? "Capturing that task natively." : "Opening task capture.",
+      feedback: cleanTitle ? "Capturing that task natively." : "Opening task capture.",
       target: {
         pathname: "/remote-work",
         params: {
           intent: "create-task",
-          ...(title ? { title } : {}),
+          ...(cleanTitle ? { title: cleanTitle } : {}),
           ...(dueDate ? { dueDate, autocreate: "1" } : {}),
         },
       },
       protected: true,
     } satisfies IntentRoute,
-    score: title ? 110 : 95,
+    score: cleanTitle ? 110 : 95,
     exact: false,
   };
 }
@@ -301,6 +305,14 @@ function resolveSentenceRoute(rawValue: string) {
         includesAny(["open my calendar", "show my calendar", "plan my week", "schedule my week"]) ||
         (hasAnyToken(["calendar", "schedule"]) && !hasAnyToken(["google", "apple"]))
           ? 96
+          : 0,
+    },
+    {
+      route: ROUTES.find((item) => item.matcher.includes("plan my day")) || null,
+      score:
+        includesAny(["what should i do today", "what is on my plate", "organize my day", "start my day"]) ||
+        (hasAnyToken(["plan", "organize"]) && hasAnyToken(["day", "today"]))
+          ? 94
           : 0,
     },
     {
@@ -384,7 +396,7 @@ export function getIntentPrompts(options: {
     "Teams",
     "Create team",
     "Join team",
-    ...(signedIn ? ["Notifications"] : []),
+    ...(signedIn ? ["Assigned tasks", "Notifications"] : []),
     ...(hasTeamAccess ? ["Attendance", "Team tasks", "Team members", "Conference"] : []),
     ...(hasAdminTeamAccess ? ["Extensions", "Team settings"] : []),
     "Profile",

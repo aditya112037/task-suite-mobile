@@ -137,6 +137,28 @@ export default function TeamsScreen() {
     } finally { setJoining(false); }
   }
 
+  async function handleRetractRequest(request: JoinRequestNotice) {
+    try {
+      await retractJoinRequest(request.teamId);
+      setPendingRequests((current) => current.filter((entry) => entry.teamId !== request.teamId));
+    } catch (err) {
+      Alert.alert("Could not retract request", err instanceof Error ? err.message : "Unknown error");
+    }
+  }
+
+  async function handleDismissRejected(request: JoinRequestNotice) {
+    if (!request.notificationId) {
+      setRejectedRequests((current) => current.filter((entry) => entry.teamId !== request.teamId));
+      return;
+    }
+    try {
+      await clearRejectedJoinRequest(request.notificationId);
+      setRejectedRequests((current) => current.filter((entry) => entry.notificationId !== request.notificationId));
+    } catch (err) {
+      Alert.alert("Could not clear request", err instanceof Error ? err.message : "Unknown error");
+    }
+  }
+
   return (
     <ScreenShell refreshing={refreshing} onRefresh={() => loadTeams(true)}>
       <View style={styles.header}>
@@ -207,6 +229,48 @@ export default function TeamsScreen() {
       {!loading && teams.length === 0 ? (
         <GlassView style={styles.emptyCard}>
           <ThemedText type="body" themeColor="textSecondary">No teams yet. Create or join one above.</ThemedText>
+        </GlassView>
+      ) : null}
+
+      {pendingRequests.length ? (
+        <GlassView style={styles.requestCard}>
+          <ThemedText type="cardTitle">Awaiting approval</ThemedText>
+          {pendingRequests.map((request) => (
+            <View key={request.teamId} style={[styles.requestRow, { borderColor: theme.divider }]}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <ThemedText type="body">{request.teamName}</ThemedText>
+                <ThemedText type="caption" themeColor="textSecondary">
+                  Your join request is with the team admin.
+                </ThemedText>
+              </View>
+              <Pressable
+                onPress={() => void handleRetractRequest(request)}
+                style={[styles.requestAction, { borderColor: theme.cardBorder }]}>
+                <ThemedText type="captionBold">Retract</ThemedText>
+              </Pressable>
+            </View>
+          ))}
+        </GlassView>
+      ) : null}
+
+      {rejectedRequests.length ? (
+        <GlassView style={styles.requestCard}>
+          <ThemedText type="cardTitle">Rejected requests</ThemedText>
+          {rejectedRequests.map((request) => (
+            <View key={request.teamId || request.notificationId || request.message} style={[styles.requestRow, { borderColor: theme.divider }]}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <ThemedText type="body">{request.teamName}</ThemedText>
+                <ThemedText type="caption" themeColor="textSecondary">
+                  This team declined your request.
+                </ThemedText>
+              </View>
+              <Pressable
+                onPress={() => void handleDismissRejected(request)}
+                style={[styles.requestAction, { borderColor: theme.cardBorder }]}>
+                <ThemedText type="captionBold">Dismiss</ThemedText>
+              </Pressable>
+            </View>
+          ))}
         </GlassView>
       ) : null}
 
@@ -297,6 +361,25 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
     borderRadius: 16,
     gap: Spacing.one,
+  },
+  requestCard: {
+    padding: Spacing.three,
+    borderRadius: 16,
+    gap: Spacing.two,
+  },
+  requestRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: Spacing.two,
+  },
+  requestAction: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one,
+    borderRadius: 999,
+    borderWidth: 1,
   },
   teamList: {
     gap: Spacing.two,

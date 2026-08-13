@@ -14,6 +14,15 @@ export async function createTask(data: {
   priority?: string;
   dueDate?: string | null;
   workspace?: string;
+  intent?: {
+    domain?: string;
+    subtype?: string;
+    confidence?: number;
+    entities?: { type: string; value: string }[];
+    source?: string;
+  };
+  capabilities?: string[];
+  dynamicFields?: Record<string, unknown>;
 }) {
   const payload = await apiRequest<PersonalTaskPayload>("/api/tasks", {
     method: "POST",

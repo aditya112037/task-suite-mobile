@@ -12,6 +12,7 @@ import { useAuth } from "@/services/auth-context";
 import { savePendingIntent, type IntentTarget } from "@/services/intent-navigation";
 import { getProfile } from "@/services/profile";
 import { getTeams } from "@/services/teams";
+import { getTaskCreationHint } from "@/services/guidance";
 import {
   getIntentPrompts,
   getIntentSuggestions,
@@ -39,6 +40,10 @@ export default function HomePage() {
     [hasAdminTeamAccess, hasTeamAccess, isLoggedIn]
   );
   const suggestions = useMemo(() => getIntentSuggestions(commandText, prompts), [commandText, prompts]);
+  const domainHint = useMemo(
+    () => (commandText.trim() ? getTaskCreationHint(commandText) : null),
+    [commandText]
+  );
   const visiblePrompts = showAllPrompts ? prompts : suggestions.length ? suggestions.slice(0, promptLimit) : prompts.slice(0, promptLimit);
   const hiddenPromptCount = Math.max(prompts.length - visiblePrompts.length, 0);
 
@@ -110,6 +115,27 @@ export default function HomePage() {
       await openTarget(routeMatch.route.target, routeMatch.route.protected);
       return;
     }
+  }
+
+  async function runDomainCreate() {
+    if (!domainHint) return;
+    const prepared = domainHint.build();
+    const cleanTitle = prepared.title
+      .replace(/\b(today|tomorrow|tonight|this evening|eod)\b/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    setCommandFeedback(`Capturing a ${domainHint.label.toLowerCase()} task.`);
+    await openTarget(
+      {
+        pathname: "/remote-work",
+        params: {
+          intent: "create-task",
+          title: cleanTitle || prepared.title,
+          ...(prepared.dueDate ? { dueDate: prepared.dueDate, autocreate: "1" } : {}),
+        },
+      },
+      true
+    );
   }
 
   if (hasToken === null) {
@@ -289,7 +315,27 @@ export default function HomePage() {
           ]}>
           <ThemedText type="smallBold">Intent response</ThemedText>
           <ThemedText themeColor="textSecondary">{commandFeedback}</ThemedText>
+          {domainHint ? (
+            <ThemedView style={styles.domainRow}>
+              <ThemedView
+                style={[styles.domainPill, { backgroundColor: `${theme.primary}1f`, borderColor: `${theme.primary}55` }]}>
+                <ThemedText type="smallBold" style={{ color: theme.primary }}>
+                  {domainHint.label} intent
+                </ThemedText>
+              </ThemedView>
+              <ThemedText themeColor="textSecondary" style={{ flex: 1, fontSize: 13 }}>
+                {domainHint.subtitle}
+              </ThemedText>
+            </ThemedView>
+          ) : null}
           <ThemedView style={styles.workflowActions}>
+            {domainHint ? (
+              <Pressable onPress={() => void runDomainCreate()} style={[styles.workflowChip, { borderColor: theme.primary, backgroundColor: `${theme.primary}1f` }]}>
+                <ThemedText type="smallBold" style={{ color: theme.primary }}>
+                  Create {domainHint.label.toLowerCase()} task
+                </ThemedText>
+              </Pressable>
+            ) : null}
             <Pressable onPress={() => void runCommand("my tasks")} style={[styles.workflowChip, { borderColor: theme.cardBorder }]}>
               <ThemedText type="smallBold">Tasks</ThemedText>
             </Pressable>
@@ -551,6 +597,17 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 12,
     gap: 10,
+  },
+  domainRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two,
+  },
+  domainPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
   },
   workflowActions: {
     flexDirection: "row",

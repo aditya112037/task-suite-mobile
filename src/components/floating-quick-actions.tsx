@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ComponentProps, useState } from "react";
 import { router, usePathname } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import {
@@ -19,10 +19,24 @@ import Animated, {
 
 import { BottomTabInset, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
+import { DOMAIN_LABELS, buildTaskCreateInitialValues } from "@/services/domain-intelligence";
 import { createTask } from "@/services/tasks";
 import { ThemedText } from "./themed-text";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+function prepareTaskCreate(text: string) {
+  const prepared = buildTaskCreateInitialValues(text);
+  const cleanTitle = prepared.title
+    .replace(/\b(today|tomorrow|tonight|this evening|eod)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return {
+    ...prepared,
+    title: cleanTitle || prepared.title,
+    dueDate: prepared.dueDate || null,
+  };
+}
 
 export function FloatingQuickActions() {
   const theme = useTheme();
@@ -40,7 +54,16 @@ export function FloatingQuickActions() {
 
     setSaving(true);
     try {
-      await createTask({ title: trimmed, workspace: "work" });
+      const prepared = prepareTaskCreate(trimmed);
+      await createTask({
+        title: prepared.title,
+        dueDate: prepared.dueDate || undefined,
+        priority: prepared.priority,
+        workspace: prepared.workspace,
+        intent: prepared.intent,
+        capabilities: prepared.capabilities,
+        dynamicFields: prepared.dynamicFields,
+      });
       setTitle("");
       setOpen(false);
       if (!pathname.includes("remote-work")) {
@@ -50,6 +73,12 @@ export function FloatingQuickActions() {
       setSaving(false);
     }
   }
+
+  const detected = title.trim() ? buildTaskCreateInitialValues(title.trim()) : null;
+  const detectedLabel =
+    detected && detected.intent.domain !== "work" && detected.intent.confidence >= 0.55
+      ? DOMAIN_LABELS[detected.intent.domain] || detected.intent.domain
+      : null;
 
   return (
     <>
@@ -126,7 +155,31 @@ export function FloatingQuickActions() {
                   icon={{ ios: "bubble.left.and.bubble.right.fill", android: "chat" }}
                   onPress={() => setTitle("Follow up with the team tomorrow")}
                 />
+                <ShortcutChip
+                  label="Groceries"
+                  icon={{ ios: "cart.fill", android: "shopping_cart" }}
+                  onPress={() => setTitle("Buy groceries for dinner tonight")}
+                />
+                <ShortcutChip
+                  label="Workout"
+                  icon={{ ios: "figure.run", android: "directions_run" }}
+                  onPress={() => setTitle("Cricket practice tomorrow")}
+                />
+                <ShortcutChip
+                  label="Pay bill"
+                  icon={{ ios: "indianrupeesign.circle.fill", android: "payments" }}
+                  onPress={() => setTitle("Pay electricity bill today")}
+                />
               </View>
+
+              {detectedLabel ? (
+                <View style={styles.detectedRow}>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {detectedLabel} intent detected
+                    {detected?.dueDate ? ` · will set due for ${new Date(detected.dueDate).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}` : ""}
+                  </ThemedText>
+                </View>
+              ) : null}
 
               <View style={styles.actionRow}>
                 <Pressable
@@ -195,7 +248,7 @@ function ShortcutChip({
   onPress,
 }: {
   label: string;
-  icon: { ios: string; android: string };
+  icon: ComponentProps<typeof SymbolView>["name"];
   onPress: () => void;
 }) {
   const theme = useTheme();
@@ -261,6 +314,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: Spacing.two,
+  },
+  detectedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.one,
+    paddingHorizontal: 2,
   },
   shortcutChip: {
     flexDirection: "row",

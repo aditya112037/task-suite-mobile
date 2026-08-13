@@ -1,15 +1,17 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
-import { router } from "expo-router";
+import { type ComponentProps, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { GlassView } from "expo-glass-effect";
 import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput, View } from "react-native";
 import Animated, { FadeInDown, LinearTransition } from "react-native-reanimated";
 
+import { IntentGuidancePanel } from "@/components/intent-guidance-panel";
 import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
 import { Brand, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/services/auth-context";
+import { buildTaskCreateInitialValues } from "@/services/domain-intelligence";
 import { getProfile, type ProfileSummary } from "@/services/profile";
 import { getMyTeamTasks, type TeamTask } from "@/services/team-tasks";
 import { createTask, getTasks, type PersonalTask } from "@/services/tasks";
@@ -20,6 +22,12 @@ type MeetingSignal = {
   teamName: string;
   active: boolean;
   participantCount: number;
+};
+
+const FOCUS_LABELS: Record<string, string> = {
+  agenda: "Today's agenda",
+  "due-soon": "Due soon",
+  assigned: "Assigned to you",
 };
 
 function isToday(value: string | null) {
@@ -51,9 +59,21 @@ function getGreeting() {
   return "Good evening";
 }
 
+function getTaskUrgency(value: string | null) {
+  if (!value) return null;
+  const dueDate = new Date(value);
+  if (Number.isNaN(dueDate.getTime())) return null;
+  return dueDate.getTime() < Date.now() ? "overdue" : null;
+}
+
 export default function HomeIntentScreen() {
   const theme = useTheme();
   const { signOut } = useAuth();
+  const params = useLocalSearchParams<{ focus?: string }>();
+  const focusType =
+    params.focus === "due-soon" || params.focus === "assigned" || params.focus === "agenda"
+      ? params.focus
+      : null;
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [teams, setTeams] = useState<TeamSummary[]>([]);
   const [personalTasks, setPersonalTasks] = useState<PersonalTask[]>([]);
@@ -97,6 +117,10 @@ export default function HomeIntentScreen() {
     if (!profile) return [];
     return teamTasks.filter((task) => task.assigneeIds.includes(profile.id) && task.status !== "completed");
   }, [profile, teamTasks]);
+  const overdueCount = useMemo(
+    () => personalTasks.filter((task) => task.status !== "completed" && getTaskUrgency(task.dueDate) === "overdue").length,
+    [personalTasks]
+  );
 
   const loadHome = useCallback(
     async (isRefresh = false) => {
@@ -163,7 +187,20 @@ export default function HomeIntentScreen() {
     if (!trimmed) return;
     setCapturing(true);
     try {
-      const created = await createTask({ title: trimmed, workspace: "work" });
+      const prepared = buildTaskCreateInitialValues(trimmed);
+      const cleanTitle = prepared.title
+        .replace(/\b(today|tomorrow|tonight|this evening|eod)\b/gi, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      const created = await createTask({
+        title: cleanTitle || prepared.title,
+        dueDate: prepared.dueDate || undefined,
+        priority: prepared.priority,
+        workspace: prepared.workspace,
+        intent: prepared.intent,
+        capabilities: prepared.capabilities,
+        dynamicFields: prepared.dynamicFields,
+      });
       setPersonalTasks((current) => [created, ...current]);
       setQuickCapture("");
     } catch (err) {
@@ -172,6 +209,175 @@ export default function HomeIntentScreen() {
       setCapturing(false);
     }
   }
+
+  const agendaWidget = (
+    <WidgetCard
+      title="Today's agenda"
+      icon={{ ios: "checklist", android: "view_list" }}
+      accent={theme.primary}>
+      {todayAgenda.length ? (
+        todayAgenda.map((task) => (
+          <AgendaRow
+            key={task.id}
+            label={task.title}
+            meta={formatDateLabel(task.dueDate)}
+            onPress={() => router.push("/calendar")}
+          />
+        ))
+      ) : (
+        <EmptyState copy="Nothing locked to today yet. Shape the day before it shapes you." />
+      )}
+    </WidgetCard>
+  );
+
+  const dueSoonWidget = (
+    <WidgetCard
+      title="Due soon"
+      icon={{ ios: "clock.fill", android: "schedule" }}
+      accent={Brand.warning}>
+      {dueSoon.length ? (
+        dueSoon.map((task) => (
+          <AgendaRow
+            key={task.id}
+            label={task.title}
+            meta={formatDateLabel(task.dueDate)}
+            onPress={() => router.push({ pathname: "/calendar", params: { focus: "upcoming" } })}
+          />
+        ))
+      ) : (
+        <EmptyState copy="Your next three days are surprisingly clear." />
+      )}
+    </WidgetCard>
+  );
+
+  const assignedWidget = (
+    <WidgetCard
+      title="Assigned to you"
+      icon={{ ios: "person.badge.clock.fill", android: "assignment_ind" }}
+      accent={Brand.secondary}
+      large>
+      {assignedToMe.length ? (
+        assignedToMe.slice(0, 3).map((task) => (
+          <AgendaRow
+            key={task.id}
+            label={task.title}
+            meta={`${task.teamName} · ${formatDateLabel(task.dueDate)}`}
+            onPress={() => router.push({ pathname: "/team/[teamId]", params: { teamId: task.teamId } })}
+          />
+        ))
+      ) : (
+        <EmptyState copy="Nothing assigned to you right now. Stay ready." />
+      )}
+    </WidgetCard>
+  );
+
+  const focusWidget = (
+    <WidgetCard
+      title="Focus mode"
+      icon={{ ios: "bolt.fill", android: "flash_on" }}
+      accent={Brand.secondary}
+      large>
+      {activeFocus ? (
+        <Pressable onPress={() => router.push("/remote-work")} style={styles.focusBody}>
+          <ThemedText type="cardTitle">{activeFocus.title}</ThemedText>
+          <ThemedText type="caption" themeColor="textSecondary">
+            {activeFocus.status === "in-progress" ? "Already moving" : "Best next move"} - {activeFocus.progressPercentage}% complete
+          </ThemedText>
+          <View style={[styles.progressTrack, { backgroundColor: theme.divider }]}>
+            <View
+              style={[
+                styles.progressFill,
+                { width: `${Math.max(8, activeFocus.progressPercentage)}%`, backgroundColor: theme.primary },
+              ]}
+            />
+          </View>
+        </Pressable>
+      ) : (
+        <EmptyState copy="No focus task yet. Capture one and we can make this screen come alive." />
+      )}
+    </WidgetCard>
+  );
+
+  const meetingsWidget = (
+    <WidgetCard
+      title="Upcoming meetings"
+      icon={{ ios: "video.fill", android: "videocam" }}
+      accent={theme.primaryLight}>
+      {meetingSignals.length ? (
+        meetingSignals.map((meeting) => (
+          <AgendaRow
+            key={meeting.teamId}
+            label={meeting.teamName}
+            meta={meeting.active ? `${meeting.participantCount} in room now` : "Ready to host when you are"}
+            onPress={() => router.push("/teams")}
+          />
+        ))
+      ) : (
+        <EmptyState copy="No team rooms connected yet." />
+      )}
+    </WidgetCard>
+  );
+
+  const continueWidget = (
+    <WidgetCard
+      title="Continue working"
+      icon={{ ios: "arrow.trianglehead.clockwise", android: "autorenew" }}
+      accent={theme.primary}
+      large>
+      {continueWorking.length ? (
+        continueWorking.map((task) => (
+          <Pressable key={task.id} onPress={() => router.push("/remote-work")} style={styles.continueCard}>
+            <View style={styles.continueHeader}>
+              <ThemedText type="body" style={{ flex: 1 }}>
+                {task.title}
+              </ThemedText>
+              <ThemedText type="captionBold">{task.progressPercentage}%</ThemedText>
+            </View>
+            <View style={[styles.progressTrack, { backgroundColor: theme.divider }]}>
+              <View
+                style={[
+                  styles.progressFill,
+                  { width: `${Math.max(8, task.progressPercentage)}%`, backgroundColor: theme.primary },
+                ]}
+              />
+            </View>
+          </Pressable>
+        ))
+      ) : (
+        <EmptyState copy="Start a task and it will stay pinned here for one-tap resume." />
+      )}
+    </WidgetCard>
+  );
+
+  const pulseWidget = (
+    <WidgetCard
+      title="Team pulse"
+      icon={{ ios: "person.3.fill", android: "groups" }}
+      accent={Brand.secondary}>
+      <AgendaRow
+        label={`${teams.length} workspaces`}
+        meta={`${assignedToMe.length} assigned to you`}
+        onPress={() => router.push("/teams")}
+      />
+      <AgendaRow
+        label={`${teamTasks.filter((task) => task.status !== "completed").length} open team tasks`}
+        meta="Coordination lives here"
+        onPress={() => router.push("/teams")}
+      />
+    </WidgetCard>
+  );
+
+  const gridOne =
+    focusType === "due-soon"
+      ? [dueSoonWidget, agendaWidget]
+      : focusType === "assigned"
+        ? [assignedWidget, agendaWidget]
+        : [agendaWidget, dueSoonWidget];
+  const gridTwo =
+    focusType === "assigned"
+      ? [focusWidget, meetingsWidget]
+      : [focusWidget, focusType === "due-soon" ? assignedWidget : meetingsWidget];
+  const gridThree = [continueWidget, pulseWidget];
 
   return (
     <ScreenShell refreshing={refreshing} onRefresh={() => loadHome(true)}>
@@ -284,139 +490,62 @@ export default function HomeIntentScreen() {
           </GlassView>
         ) : null}
 
-        <Animated.View entering={FadeInDown.delay(40).duration(260)} style={styles.widgetGrid}>
-          <WidgetCard
-            title="Today's agenda"
-            icon={{ ios: "checklist", android: "view_list" }}
-            accent={theme.primary}>
-            {todayAgenda.length ? (
-              todayAgenda.map((task) => (
-                <AgendaRow
-                  key={task.id}
-                  label={task.title}
-                  meta={formatDateLabel(task.dueDate)}
-                  onPress={() => router.push("/calendar")}
-                />
-              ))
-            ) : (
-              <EmptyState copy="Nothing locked to today yet. Shape the day before it shapes you." />
-            )}
-          </WidgetCard>
+        {focusType ? (
+          <Animated.View entering={FadeInDown.duration(200)}>
+            <GlassView
+              style={[styles.focusBanner, { backgroundColor: theme.backgroundElement, borderColor: theme.cardBorder }]}>
+              <SymbolView name={{ ios: "arrow.down.left.circle.fill", android: "ads_click" }} size={16} tintColor={theme.primary} />
+              <ThemedText type="captionBold">
+                Focused: {FOCUS_LABELS[focusType] || focusType}
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                via your command
+              </ThemedText>
+            </GlassView>
+          </Animated.View>
+        ) : null}
 
-          <WidgetCard
-            title="Due soon"
-            icon={{ ios: "clock.fill", android: "schedule" }}
-            accent={Brand.warning}>
-            {dueSoon.length ? (
-              dueSoon.map((task) => (
-                <AgendaRow
-                  key={task.id}
-                  label={task.title}
-                  meta={formatDateLabel(task.dueDate)}
-                  onPress={() => router.push({ pathname: "/calendar", params: { focus: "upcoming" } })}
-                />
-              ))
-            ) : (
-              <EmptyState copy="Your next three days are surprisingly clear." />
-            )}
-          </WidgetCard>
+        <IntentGuidancePanel
+          surface="dashboard"
+          context={{
+            completionRate: profile?.progress.completionRate,
+            onTimeRate: profile?.progress.onTimeRate,
+            teamCount: teams.length,
+            taskCount: personalTasks.length,
+            completedCount: profile?.progress.personalCompletedTasks,
+            atRiskCount: overdueCount,
+          }}
+          onApply={(action) => {
+            if (action.type === "open-tasks") {
+              router.push("/remote-work");
+              return;
+            }
+            if (typeof action.value === "string") {
+              Alert.alert("Guidance", action.value);
+            }
+          }}
+        />
+
+        <Animated.View entering={FadeInDown.delay(40).duration(260)} style={styles.widgetGrid}>
+          {gridOne[0]}
+          {gridOne[1]}
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(80).duration(260)} style={styles.widgetGrid}>
-          <WidgetCard
-            title="Focus mode"
-            icon={{ ios: "bolt.fill", android: "flash_on" }}
-            accent={Brand.secondary}
-            large>
-            {activeFocus ? (
-              <Pressable onPress={() => router.push("/remote-work")} style={styles.focusBody}>
-                <ThemedText type="cardTitle">{activeFocus.title}</ThemedText>
-                <ThemedText type="caption" themeColor="textSecondary">
-                  {activeFocus.status === "in-progress" ? "Already moving" : "Best next move"} - {activeFocus.progressPercentage}% complete
-                </ThemedText>
-                <View style={[styles.progressTrack, { backgroundColor: theme.divider }]}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      { width: `${Math.max(8, activeFocus.progressPercentage)}%`, backgroundColor: theme.primary },
-                    ]}
-                  />
-                </View>
-              </Pressable>
-            ) : (
-              <EmptyState copy="No focus task yet. Capture one and we can make this screen come alive." />
-            )}
-          </WidgetCard>
-
-          <WidgetCard
-            title="Upcoming meetings"
-            icon={{ ios: "video.fill", android: "videocam" }}
-            accent={theme.primaryLight}>
-            {meetingSignals.length ? (
-              meetingSignals.map((meeting) => (
-                <AgendaRow
-                  key={meeting.teamId}
-                  label={meeting.teamName}
-                  meta={meeting.active ? `${meeting.participantCount} in room now` : "Ready to host when you are"}
-                  onPress={() => router.push("/teams")}
-                />
-              ))
-            ) : (
-              <EmptyState copy="No team rooms connected yet." />
-            )}
-          </WidgetCard>
+          {gridTwo[0]}
+          {gridTwo[1]}
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(120).duration(260)} style={styles.widgetGrid}>
-          <WidgetCard
-            title="Continue working"
-            icon={{ ios: "arrow.trianglehead.clockwise", android: "autorenew" }}
-            accent={theme.primary}
-            large>
-            {continueWorking.length ? (
-              continueWorking.map((task) => (
-                <Pressable key={task.id} onPress={() => router.push("/remote-work")} style={styles.continueCard}>
-                  <View style={styles.continueHeader}>
-                    <ThemedText type="body" style={{ flex: 1 }}>
-                      {task.title}
-                    </ThemedText>
-                    <ThemedText type="captionBold">{task.progressPercentage}%</ThemedText>
-                  </View>
-                  <View style={[styles.progressTrack, { backgroundColor: theme.divider }]}>
-                    <View
-                      style={[
-                        styles.progressFill,
-                        { width: `${Math.max(8, task.progressPercentage)}%`, backgroundColor: theme.primary },
-                      ]}
-                    />
-                  </View>
-                </Pressable>
-              ))
-            ) : (
-              <EmptyState copy="Start a task and it will stay pinned here for one-tap resume." />
-            )}
-          </WidgetCard>
-
-          <WidgetCard
-            title="Team pulse"
-            icon={{ ios: "person.3.fill", android: "groups" }}
-            accent={Brand.secondary}>
-            <AgendaRow
-              label={`${teams.length} workspaces`}
-              meta={`${assignedToMe.length} assigned to you`}
-              onPress={() => router.push("/teams")}
-            />
-            <AgendaRow
-              label={`${teamTasks.filter((task) => task.status !== "completed").length} open team tasks`}
-              meta="Coordination lives here"
-              onPress={() => router.push("/teams")}
-            />
-          </WidgetCard>
+          {gridThree[0]}
+          {gridThree[1]}
         </Animated.View>
       </Animated.View>
     </ScreenShell>
   );
 }
+
+type WidgetIcon = ComponentProps<typeof SymbolView>["name"];
 
 function WidgetCard({
   title,
@@ -426,7 +555,7 @@ function WidgetCard({
   children,
 }: {
   title: string;
-  icon: { ios: string; android: string };
+  icon: WidgetIcon;
   accent: string;
   large?: boolean;
   children: ReactNode;
@@ -557,6 +686,15 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
+  },
+  focusBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 10,
   },
   loadingWrap: {
     paddingVertical: Spacing.five,
