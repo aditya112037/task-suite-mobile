@@ -3,6 +3,10 @@
     "name": "task-suite-mobile",
     "slug": "task-suite-mobile",
     "version": "1.0.0",
+    "updates": {
+      "enabled": false,
+      "checkAutomatically": "NEVER"
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "tasksuitemobile",
@@ -12,7 +16,8 @@
       "infoPlist": {
         "NSCameraUsageDescription": "TaskSuite uses the camera for video calls in team conferences.",
         "NSMicrophoneUsageDescription": "TaskSuite uses the microphone for audio in team conferences."
-      }
+      },
+      "bundleIdentifier": "co.tasksuite.app"
     },
     "android": {
       "package": "co.tasksuite.app",

@@ -1,3 +1,6 @@
+import { GlassView } from "expo-glass-effect";
+import { LinearGradient } from "expo-linear-gradient";
+import { useLocalSearchParams, useRouter, type Href } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -10,17 +13,14 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { GlassView } from "expo-glass-effect";
-import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter, type Href } from "expo-router";
 
 import { ThemedText } from "@/components/themed-text";
 import { Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { login, register } from "@/services/auth";
-import { signInWithGoogle } from "@/services/googleAuth";
 import { useAuth } from "@/services/auth-context";
+import { signInWithGoogle } from "@/services/googleAuth";
 import { consumePendingIntent } from "@/services/intent-navigation";
 
 export default function LoginScreen() {
@@ -36,6 +36,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const hasRedirectedRef = useRef(false);
+  const [legalConsent, setLegalConsent] = useState(false);
 
   const completeAuthRedirect = useCallback(async () => {
     hasRedirectedRef.current = true;
@@ -64,10 +65,17 @@ export default function LoginScreen() {
       Alert.alert("Error", "Please enter your name");
       return;
     }
+    if (isRegister && !legalConsent) {
+      Alert.alert(
+        "Consent required",
+        "Please accept the Terms of Service and Privacy Policy.",
+      );
+      return;
+    }
     setLoading(true);
     try {
       const user = isRegister
-        ? await register(name, email, password)
+        ? await register(name, email, password, legalConsent)
         : await login(email, password);
       Alert.alert("Success", `Welcome ${user.name}`);
       await checkToken();
@@ -146,10 +154,18 @@ export default function LoginScreen() {
             <ThemedText style={[styles.eyebrow, { color: theme.secondary }]}>
               TASK SUITE
             </ThemedText>
-            <ThemedText type="hero" themeColor="primary" style={{ textAlign: "center" }}>
+            <ThemedText
+              type="hero"
+              themeColor="primary"
+              style={{ textAlign: "center" }}
+            >
               {isRegister ? "Create Account" : "Welcome Back"}
             </ThemedText>
-            <ThemedText type="body" themeColor="textSecondary" style={{ textAlign: "center", maxWidth: 420 }}>
+            <ThemedText
+              type="body"
+              themeColor="textSecondary"
+              style={{ textAlign: "center", maxWidth: 420 }}
+            >
               {isRegister
                 ? "Build your workspace with the same Task Suite flow as the web app."
                 : "Sign in to continue with your teams, tasks, reports, and mobile workspace."}
@@ -187,20 +203,40 @@ export default function LoginScreen() {
               </Pressable>
 
               <View style={styles.divider}>
-                <View style={[styles.dividerLine, { backgroundColor: theme.divider }]} />
-                <ThemedText style={[styles.dividerText, { color: theme.textSecondary }]}>or</ThemedText>
-                <View style={[styles.dividerLine, { backgroundColor: theme.divider }]} />
+                <View
+                  style={[
+                    styles.dividerLine,
+                    { backgroundColor: theme.divider },
+                  ]}
+                />
+                <ThemedText
+                  style={[styles.dividerText, { color: theme.textSecondary }]}
+                >
+                  or
+                </ThemedText>
+                <View
+                  style={[
+                    styles.dividerLine,
+                    { backgroundColor: theme.divider },
+                  ]}
+                />
               </View>
 
               {isRegister && (
                 <View style={styles.fieldGroup}>
-                  <ThemedText style={[styles.label, { color: theme.textSecondary }]}>Full Name</ThemedText>
+                  <ThemedText
+                    style={[styles.label, { color: theme.textSecondary }]}
+                  >
+                    Full Name
+                  </ThemedText>
                   <TextInput
                     style={[
                       styles.input,
                       {
                         borderColor:
-                          focusedField === "name" ? theme.primary : theme.divider,
+                          focusedField === "name"
+                            ? theme.primary
+                            : theme.divider,
                         backgroundColor: theme.backgroundElement,
                         color: theme.text,
                       },
@@ -217,13 +253,19 @@ export default function LoginScreen() {
               )}
 
               <View style={styles.fieldGroup}>
-                <ThemedText style={[styles.label, { color: theme.textSecondary }]}>Email Address</ThemedText>
+                <ThemedText
+                  style={[styles.label, { color: theme.textSecondary }]}
+                >
+                  Email Address
+                </ThemedText>
                 <TextInput
                   style={[
                     styles.input,
                     {
                       borderColor:
-                        focusedField === "email" ? theme.primary : theme.divider,
+                        focusedField === "email"
+                          ? theme.primary
+                          : theme.divider,
                       backgroundColor: theme.backgroundElement,
                       color: theme.text,
                     },
@@ -241,13 +283,19 @@ export default function LoginScreen() {
               </View>
 
               <View style={styles.fieldGroup}>
-                <ThemedText style={[styles.label, { color: theme.textSecondary }]}>Password</ThemedText>
+                <ThemedText
+                  style={[styles.label, { color: theme.textSecondary }]}
+                >
+                  Password
+                </ThemedText>
                 <TextInput
                   style={[
                     styles.input,
                     {
                       borderColor:
-                        focusedField === "password" ? theme.primary : theme.divider,
+                        focusedField === "password"
+                          ? theme.primary
+                          : theme.divider,
                       backgroundColor: theme.backgroundElement,
                       color: theme.text,
                     },
@@ -257,16 +305,63 @@ export default function LoginScreen() {
                   secureTextEntry
                   value={password}
                   onChangeText={setPassword}
-                  autoComplete={isRegister ? "new-password" : "current-password"}
+                  autoComplete={
+                    isRegister ? "new-password" : "current-password"
+                  }
                   onFocus={() => setFocusedField("password")}
                   onBlur={() => setFocusedField(null)}
                 />
               </View>
 
+              {isRegister && (
+                <Pressable
+                  onPress={() => setLegalConsent((current) => !current)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 10,
+                    paddingVertical: 8,
+                    marginBottom: 8,
+                  }}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: legalConsent }}
+                >
+                  <View
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 5,
+                      borderWidth: 1.5,
+                      borderColor: theme.primary,
+                      backgroundColor: legalConsent
+                        ? theme.primary
+                        : "transparent",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {legalConsent && (
+                      <ThemedText style={{ color: "#fff", fontSize: 14 }}>
+                        ✓
+                      </ThemedText>
+                    )}
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={{ color: theme.text, fontSize: 13 }}>
+                      I accept the Terms of Service and Privacy Policy.
+                    </ThemedText>
+                  </View>
+                </Pressable>
+              )}
+
               <Pressable
                 style={({ pressed }) => [
                   styles.submitButton,
-                  { backgroundColor: theme.primary, opacity: pressed || loading ? 0.8 : 1 },
+                  {
+                    backgroundColor: theme.primary,
+                    opacity: pressed || loading ? 0.8 : 1,
+                  },
                 ]}
                 onPress={handleSubmit}
                 disabled={loading}
@@ -282,11 +377,15 @@ export default function LoginScreen() {
             </GlassView>
 
             <View style={styles.footer}>
-              <ThemedText style={[styles.footerText, { color: theme.textSecondary }]}>
+              <ThemedText
+                style={[styles.footerText, { color: theme.textSecondary }]}
+              >
                 {isRegister ? "Already have an account?" : "New here?"}
               </ThemedText>
               <Pressable onPress={() => setIsRegister(!isRegister)}>
-                <ThemedText style={[styles.footerLink, { color: theme.secondary }]}>
+                <ThemedText
+                  style={[styles.footerLink, { color: theme.secondary }]}
+                >
                   {isRegister ? "Login" : "Create account"}
                 </ThemedText>
               </Pressable>

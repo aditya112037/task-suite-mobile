@@ -1,5 +1,4 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { GoogleSignin } from "@react-native-google-signin/google-signin";
 
 import { TOKEN_STORAGE_KEY, apiRequest } from "@/services/api";
 
@@ -11,6 +10,11 @@ type GoogleAuthResponse = {
 };
 
 export async function signInWithGoogle() {
+  // Load the native Google Sign-In module only when the user taps the button.
+  const { GoogleSignin } = await import(
+    "@react-native-google-signin/google-signin"
+  );
+
   if (!configured) {
     GoogleSignin.configure({
       webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
@@ -28,10 +32,13 @@ export async function signInWithGoogle() {
     throw new Error("No ID token from Google");
   }
 
-  const user = await apiRequest<GoogleAuthResponse>("/api/auth/google/mobile", {
-    method: "POST",
-    body: JSON.stringify({ idToken }),
-  });
+  const user = await apiRequest<GoogleAuthResponse>(
+    "/api/auth/google/mobile",
+    {
+      method: "POST",
+      body: JSON.stringify({ idToken }),
+    },
+  );
 
   await AsyncStorage.setItem(TOKEN_STORAGE_KEY, user.token);
 

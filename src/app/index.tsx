@@ -285,7 +285,12 @@ export default function HomePage() {
         ) : null}
 
         <Pressable
-          onPress={() => void openTarget({ pathname: "/dashboard" }, true)}
+          onPress={() => {if (isLoggedIn) {
+            router.push("/dashboard");
+          } else {
+            void openTarget({ pathname: "/dashboard" }, true);
+          }
+        }}
           style={[styles.primaryCta, isTiny ? styles.primaryCtaTiny : null, { backgroundColor: theme.primary }]}>
           <SymbolView name={{ ios: "square.grid.2x2.fill", android: "dashboard" }} size={20} tintColor="#f5f1ea" />
           <ThemedText type="smallBold" style={[styles.primaryCtaText, isCompact ? styles.primaryCtaTextCompact : null]}>
@@ -295,8 +300,12 @@ export default function HomePage() {
 
         <Pressable
           onPress={() => {
-            setCommandFeedback("Try tasks, calendar, teams, attendance, or create task.");
-          }}
+  if (isLoggedIn) {
+    router.push("/dashboard");
+  } else {
+    router.push("/(auth)/login");
+  }
+}}
           style={[styles.secondaryCta, isTiny ? styles.secondaryCtaTiny : null, { borderColor: theme.cardBorder, backgroundColor: "rgba(255,255,255,0.32)" }]}>
           <ThemedText type="smallBold">Get started</ThemedText>
         </Pressable>
