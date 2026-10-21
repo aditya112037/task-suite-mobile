@@ -3,7 +3,7 @@ import { DarkTheme, DefaultTheme, Redirect, ThemeProvider } from "expo-router";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import AppTabs from "@/components/app-tabs";
-import { FloatingQuickActions } from "@/components/floating-quick-actions";
+// import { FloatingQuickActions } from "@/components/floating-quick-actions";
 import { useAuth } from "@/services/auth-context";
 
 export default function TabsLayout() {
@@ -26,7 +26,8 @@ export default function TabsLayout() {
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
       <AnimatedSplashOverlay />
       <AppTabs />
-      <FloatingQuickActions />
+      {/* dashboard-v2 is registered here so Expo Router can resolve /dashboard-v2 */}
+      {/* <FloatingQuickActions /> */}
     </ThemeProvider>
   );
 }

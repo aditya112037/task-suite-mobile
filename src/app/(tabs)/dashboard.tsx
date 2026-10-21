@@ -1,21 +1,41 @@
-import { type ComponentProps, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { GlassView } from "expo-glass-effect";
 import { router, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
-import { GlassView } from "expo-glass-effect";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput, View } from "react-native";
-import Animated, { FadeInDown, LinearTransition } from "react-native-reanimated";
+import {
+  type ComponentProps,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+} from "react-native";
+import Animated, {
+  FadeInDown,
+  LinearTransition,
+} from "react-native-reanimated";
 
-import { IntentGuidancePanel } from "@/components/intent-guidance-panel";
 import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
-import { Brand, Spacing } from "@/constants/theme";
+import { Brand } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/services/auth-context";
 import { buildTaskCreateInitialValues } from "@/services/domain-intelligence";
 import { getProfile, type ProfileSummary } from "@/services/profile";
-import { getMyTeamTasks, type TeamTask } from "@/services/team-tasks";
 import { createTask, getTasks, type PersonalTask } from "@/services/tasks";
-import { getConferenceStatus, getTeams, type TeamSummary } from "@/services/teams";
+import { getMyTeamTasks, type TeamTask } from "@/services/team-tasks";
+import {
+  getConferenceStatus,
+  getTeams,
+  type TeamSummary,
+} from "@/services/teams";
 
 type MeetingSignal = {
   teamId: string;
@@ -71,7 +91,9 @@ export default function HomeIntentScreen() {
   const { signOut } = useAuth();
   const params = useLocalSearchParams<{ focus?: string }>();
   const focusType =
-    params.focus === "due-soon" || params.focus === "assigned" || params.focus === "agenda"
+    params.focus === "due-soon" ||
+    params.focus === "assigned" ||
+    params.focus === "agenda"
       ? params.focus
       : null;
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
@@ -87,39 +109,58 @@ export default function HomeIntentScreen() {
 
   const openTasks = useMemo(
     () => personalTasks.filter((task) => task.status !== "completed"),
-    [personalTasks]
+    [personalTasks],
   );
   const todayAgenda = useMemo(
     () => openTasks.filter((task) => isToday(task.dueDate)).slice(0, 3),
-    [openTasks]
+    [openTasks],
   );
   const dueSoon = useMemo(
     () =>
       openTasks
-        .filter((task) => isWithinDays(task.dueDate, 3) || isToday(task.dueDate))
+        .filter(
+          (task) => isWithinDays(task.dueDate, 3) || isToday(task.dueDate),
+        )
         .sort((left, right) => {
-          const leftTime = left.dueDate ? new Date(left.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
-          const rightTime = right.dueDate ? new Date(right.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+          const leftTime = left.dueDate
+            ? new Date(left.dueDate).getTime()
+            : Number.MAX_SAFE_INTEGER;
+          const rightTime = right.dueDate
+            ? new Date(right.dueDate).getTime()
+            : Number.MAX_SAFE_INTEGER;
           return leftTime - rightTime;
         })
         .slice(0, 4),
-    [openTasks]
+    [openTasks],
   );
   const activeFocus = useMemo(
-    () => personalTasks.find((task) => task.status === "in-progress") || dueSoon[0] || openTasks[0] || null,
-    [dueSoon, openTasks, personalTasks]
+    () =>
+      personalTasks.find((task) => task.status === "in-progress") ||
+      dueSoon[0] ||
+      openTasks[0] ||
+      null,
+    [dueSoon, openTasks, personalTasks],
   );
   const continueWorking = useMemo(
-    () => personalTasks.filter((task) => task.status === "in-progress").slice(0, 2),
-    [personalTasks]
+    () =>
+      personalTasks.filter((task) => task.status === "in-progress").slice(0, 2),
+    [personalTasks],
   );
   const assignedToMe = useMemo(() => {
     if (!profile) return [];
-    return teamTasks.filter((task) => task.assigneeIds.includes(profile.id) && task.status !== "completed");
+    return teamTasks.filter(
+      (task) =>
+        task.assigneeIds.includes(profile.id) && task.status !== "completed",
+    );
   }, [profile, teamTasks]);
   const overdueCount = useMemo(
-    () => personalTasks.filter((task) => task.status !== "completed" && getTaskUrgency(task.dueDate) === "overdue").length,
-    [personalTasks]
+    () =>
+      personalTasks.filter(
+        (task) =>
+          task.status !== "completed" &&
+          getTaskUrgency(task.dueDate) === "overdue",
+      ).length,
+    [personalTasks],
   );
 
   const loadHome = useCallback(
@@ -129,11 +170,9 @@ export default function HomeIntentScreen() {
         else setLoading(true);
 
         const nextProfile = await getProfile();
-        const [nextPersonalTasks, nextTeamTasks, nextTeams] = await Promise.all([
-          getTasks(),
-          getMyTeamTasks(),
-          getTeams(nextProfile.id),
-        ]);
+        const [nextPersonalTasks, nextTeamTasks, nextTeams] = await Promise.all(
+          [getTasks(), getMyTeamTasks(), getTeams(nextProfile.id)],
+        );
 
         const conferenceSignals = await Promise.all(
           nextTeams.slice(0, 3).map(async (team) => {
@@ -153,7 +192,7 @@ export default function HomeIntentScreen() {
                 participantCount: 0,
               } satisfies MeetingSignal;
             }
-          })
+          }),
         );
 
         setProfile(nextProfile);
@@ -163,9 +202,13 @@ export default function HomeIntentScreen() {
         setMeetingSignals(conferenceSignals);
         setError(null);
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to load your workspace";
+        const message =
+          err instanceof Error ? err.message : "Failed to load your workspace";
         setError(message);
-        if (message.toLowerCase().includes("session") || message.toLowerCase().includes("authorized")) {
+        if (
+          message.toLowerCase().includes("session") ||
+          message.toLowerCase().includes("authorized")
+        ) {
           await signOut();
           Alert.alert("Session expired", "Please sign in again.");
         }
@@ -174,7 +217,7 @@ export default function HomeIntentScreen() {
         setRefreshing(false);
       }
     },
-    [signOut]
+    [signOut],
   );
 
   useEffect(() => {
@@ -204,7 +247,10 @@ export default function HomeIntentScreen() {
       setPersonalTasks((current) => [created, ...current]);
       setQuickCapture("");
     } catch (err) {
-      Alert.alert("Error", err instanceof Error ? err.message : "Could not create task");
+      Alert.alert(
+        "Error",
+        err instanceof Error ? err.message : "Could not create task",
+      );
     } finally {
       setCapturing(false);
     }
@@ -214,7 +260,8 @@ export default function HomeIntentScreen() {
     <WidgetCard
       title="Today's agenda"
       icon={{ ios: "checklist", android: "view_list" }}
-      accent={theme.primary}>
+      accent={theme.primary}
+    >
       {todayAgenda.length ? (
         todayAgenda.map((task) => (
           <AgendaRow
@@ -234,14 +281,20 @@ export default function HomeIntentScreen() {
     <WidgetCard
       title="Due soon"
       icon={{ ios: "clock.fill", android: "schedule" }}
-      accent={Brand.warning}>
+      accent={Brand.warning}
+    >
       {dueSoon.length ? (
         dueSoon.map((task) => (
           <AgendaRow
             key={task.id}
             label={task.title}
             meta={formatDateLabel(task.dueDate)}
-            onPress={() => router.push({ pathname: "/calendar", params: { focus: "upcoming" } })}
+            onPress={() =>
+              router.push({
+                pathname: "/calendar",
+                params: { focus: "upcoming" },
+              })
+            }
           />
         ))
       ) : (
@@ -255,14 +308,20 @@ export default function HomeIntentScreen() {
       title="Assigned to you"
       icon={{ ios: "person.badge.clock.fill", android: "assignment_ind" }}
       accent={Brand.secondary}
-      large>
+      large
+    >
       {assignedToMe.length ? (
         assignedToMe.slice(0, 3).map((task) => (
           <AgendaRow
             key={task.id}
             label={task.title}
             meta={`${task.teamName} · ${formatDateLabel(task.dueDate)}`}
-            onPress={() => router.push({ pathname: "/team/[teamId]", params: { teamId: task.teamId } })}
+            onPress={() =>
+              router.push({
+                pathname: "/team/[teamId]",
+                params: { teamId: task.teamId },
+              })
+            }
           />
         ))
       ) : (
@@ -276,18 +335,30 @@ export default function HomeIntentScreen() {
       title="Focus mode"
       icon={{ ios: "bolt.fill", android: "flash_on" }}
       accent={Brand.secondary}
-      large>
+      large
+    >
       {activeFocus ? (
-        <Pressable onPress={() => router.push("/remote-work")} style={styles.focusBody}>
+        <Pressable
+          onPress={() => router.push("/remote-work")}
+          style={styles.focusBody}
+        >
           <ThemedText type="cardTitle">{activeFocus.title}</ThemedText>
           <ThemedText type="caption" themeColor="textSecondary">
-            {activeFocus.status === "in-progress" ? "Already moving" : "Best next move"} - {activeFocus.progressPercentage}% complete
+            {activeFocus.status === "in-progress"
+              ? "Already moving"
+              : "Best next move"}{" "}
+            - {activeFocus.progressPercentage}% complete
           </ThemedText>
-          <View style={[styles.progressTrack, { backgroundColor: theme.divider }]}>
+          <View
+            style={[styles.progressTrack, { backgroundColor: theme.divider }]}
+          >
             <View
               style={[
                 styles.progressFill,
-                { width: `${Math.max(8, activeFocus.progressPercentage)}%`, backgroundColor: theme.primary },
+                {
+                  width: `${Math.max(8, activeFocus.progressPercentage)}%`,
+                  backgroundColor: theme.primary,
+                },
               ]}
             />
           </View>
@@ -302,13 +373,19 @@ export default function HomeIntentScreen() {
     <WidgetCard
       title="Upcoming meetings"
       icon={{ ios: "video.fill", android: "videocam" }}
-      accent={theme.primaryLight}>
+      accent={theme.primaryLight}
+      large
+    >
       {meetingSignals.length ? (
         meetingSignals.map((meeting) => (
           <AgendaRow
             key={meeting.teamId}
             label={meeting.teamName}
-            meta={meeting.active ? `${meeting.participantCount} in room now` : "Ready to host when you are"}
+            meta={
+              meeting.active
+                ? `${meeting.participantCount} in room now`
+                : "Ready to host when you are"
+            }
             onPress={() =>
               router.push({
                 pathname: "/team/[teamId]",
@@ -328,21 +405,33 @@ export default function HomeIntentScreen() {
       title="Continue working"
       icon={{ ios: "arrow.trianglehead.clockwise", android: "autorenew" }}
       accent={theme.primary}
-      large>
+      large
+    >
       {continueWorking.length ? (
         continueWorking.map((task) => (
-          <Pressable key={task.id} onPress={() => router.push("/remote-work")} style={styles.continueCard}>
+          <Pressable
+            key={task.id}
+            onPress={() => router.push("/remote-work")}
+            style={styles.continueCard}
+          >
             <View style={styles.continueHeader}>
               <ThemedText type="body" style={{ flex: 1 }}>
                 {task.title}
               </ThemedText>
-              <ThemedText type="captionBold">{task.progressPercentage}%</ThemedText>
+              <ThemedText type="captionBold">
+                {task.progressPercentage}%
+              </ThemedText>
             </View>
-            <View style={[styles.progressTrack, { backgroundColor: theme.divider }]}>
+            <View
+              style={[styles.progressTrack, { backgroundColor: theme.divider }]}
+            >
               <View
                 style={[
                   styles.progressFill,
-                  { width: `${Math.max(8, task.progressPercentage)}%`, backgroundColor: theme.primary },
+                  {
+                    width: `${Math.max(8, task.progressPercentage)}%`,
+                    backgroundColor: theme.primary,
+                  },
                 ]}
               />
             </View>
@@ -358,7 +447,9 @@ export default function HomeIntentScreen() {
     <WidgetCard
       title="Team pulse"
       icon={{ ios: "person.3.fill", android: "groups" }}
-      accent={Brand.secondary}>
+      accent={Brand.secondary}
+      large
+    >
       <AgendaRow
         label={`${teams.length} workspaces`}
         meta={`${assignedToMe.length} assigned to you`}
@@ -372,21 +463,51 @@ export default function HomeIntentScreen() {
     </WidgetCard>
   );
 
-  const gridOne =
-    focusType === "due-soon"
-      ? [dueSoonWidget, agendaWidget]
-      : focusType === "assigned"
-        ? [assignedWidget, agendaWidget]
-        : [agendaWidget, dueSoonWidget];
-  const gridTwo =
-    focusType === "assigned"
-      ? [focusWidget, meetingsWidget]
-      : [focusWidget, focusType === "due-soon" ? assignedWidget : meetingsWidget];
-  const gridThree = [continueWidget, pulseWidget];
+  const tasksWidget = (
+    <WidgetCard
+      title="Upcoming tasks"
+      icon={{ ios: "checklist", android: "checklist" }}
+      accent="#329CF5"
+      large
+    >
+      {openTasks.length > 0 ? (
+        openTasks
+          .slice(0, 2)
+          .map((task) => (
+            <AgendaRow
+              key={task.id}
+              label={task.title}
+              meta={formatDateLabel(task.dueDate)}
+              onPress={() => router.push("/remote-work")}
+            />
+          ))
+      ) : (
+        <EmptyState copy="No tasks yet. Create one to start." />
+      )}
+    </WidgetCard>
+  );
+
+  // const gridOne =
+  //   focusType === "due-soon"
+  //     ? [dueSoonWidget, agendaWidget]
+  //     : focusType === "assigned"
+  //       ? [assignedWidget, agendaWidget]
+  //       : [agendaWidget, dueSoonWidget];
+  // const gridTwo =
+  //   focusType === "assigned"
+  //     ? [focusWidget, meetingsWidget]
+  //     : [
+  //         focusWidget,
+  //         focusType === "due-soon" ? assignedWidget : meetingsWidget,
+  //       ];
+  // const gridThree = [continueWidget, pulseWidget];
 
   return (
     <ScreenShell refreshing={refreshing} onRefresh={() => loadHome(true)}>
-      <Animated.View layout={LinearTransition.springify().damping(18).stiffness(170)} style={styles.container}>
+      <Animated.View
+        layout={LinearTransition.springify().damping(18).stiffness(170)}
+        style={styles.container}
+      >
         <Animated.View entering={FadeInDown.duration(260)} style={styles.hero}>
           <View style={styles.topRow}>
             <Pressable
@@ -397,7 +518,8 @@ export default function HomeIntentScreen() {
                   backgroundColor: theme.backgroundElement,
                   borderColor: theme.cardBorder,
                 },
-              ]}>
+              ]}
+            >
               <SymbolView
                 name={{ ios: "house.fill", android: "home" }}
                 size={16}
@@ -425,24 +547,6 @@ export default function HomeIntentScreen() {
               </ThemedText>
             </View>
 
-            <Pressable
-              onPress={() => router.push("/profile")}
-              style={[
-                styles.heroBadge,
-                {
-                  backgroundColor: theme.backgroundElement,
-                  borderColor: theme.cardBorder,
-                },
-              ]}>
-              <SymbolView
-                name={{ ios: "person.crop.circle.fill", android: "account_circle" }}
-                size={22}
-                tintColor={theme.primary}
-              />
-              <ThemedText type="captionBold">
-                {profile?.progress.activeTasks || openTasks.length} active
-              </ThemedText>
-            </Pressable>
           </View>
 
           <View
@@ -452,7 +556,8 @@ export default function HomeIntentScreen() {
                 backgroundColor: theme.heroSurface,
                 borderColor: theme.cardBorder,
               },
-            ]}>
+            ]}
+          >
             <TextInput
               value={quickCapture}
               onChangeText={setQuickCapture}
@@ -470,11 +575,16 @@ export default function HomeIntentScreen() {
                   backgroundColor: theme.primary,
                   opacity: capturing || !quickCapture.trim() ? 0.55 : 1,
                 },
-              ]}>
+              ]}
+            >
               {capturing ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <SymbolView name={{ ios: "mic.fill", android: "mic" }} size={18} tintColor="#fff" />
+                <SymbolView
+                  name={{ ios: "mic.fill", android: "mic" }}
+                  size={18}
+                  tintColor="#fff"
+                />
               )}
             </Pressable>
           </View>
@@ -498,8 +608,22 @@ export default function HomeIntentScreen() {
         {focusType ? (
           <Animated.View entering={FadeInDown.duration(200)}>
             <GlassView
-              style={[styles.focusBanner, { backgroundColor: theme.backgroundElement, borderColor: theme.cardBorder }]}>
-              <SymbolView name={{ ios: "arrow.down.left.circle.fill", android: "ads_click" }} size={16} tintColor={theme.primary} />
+              style={[
+                styles.focusBanner,
+                {
+                  backgroundColor: theme.backgroundElement,
+                  borderColor: theme.cardBorder,
+                },
+              ]}
+            >
+              <SymbolView
+                name={{
+                  ios: "arrow.down.left.circle.fill",
+                  android: "ads_click",
+                }}
+                size={16}
+                tintColor={theme.primary}
+              />
               <ThemedText type="captionBold">
                 Focused: {FOCUS_LABELS[focusType] || focusType}
               </ThemedText>
@@ -510,7 +634,7 @@ export default function HomeIntentScreen() {
           </Animated.View>
         ) : null}
 
-        <IntentGuidancePanel
+        {/* <IntentGuidancePanel
           surface="dashboard"
           context={{
             completionRate: profile?.progress.completionRate,
@@ -529,22 +653,29 @@ export default function HomeIntentScreen() {
               Alert.alert("Guidance", action.value);
             }
           }}
-        />
+        /> */}
 
-        <Animated.View entering={FadeInDown.delay(40).duration(260)} style={styles.widgetGrid}>
-          {gridOne[0]}
-          {gridOne[1]}
-        </Animated.View>
+        <View style={styles.dashboardSection}>
+          <SectionHeading
+            title="Upcoming items"
+            icon={{ ios: "calendar", android: "event" }}
+            accent={theme.primary}
+            onViewAll={() => router.push("/calendar")}
+          />
+          <Animated.View
+            entering={FadeInDown.delay(40).duration(260)}
+            style={styles.widgetGrid}
+          >
+            {meetingsWidget}
+            {tasksWidget}
+          </Animated.View>
+        </View>
 
-        <Animated.View entering={FadeInDown.delay(80).duration(260)} style={styles.widgetGrid}>
-          {gridTwo[0]}
-          {gridTwo[1]}
-        </Animated.View>
+        {/* Continue working */}
+        <View style={styles.dashboardSection}>{continueWidget}</View>
 
-        <Animated.View entering={FadeInDown.delay(120).duration(260)} style={styles.widgetGrid}>
-          {gridThree[0]}
-          {gridThree[1]}
-        </Animated.View>
+        {/* Team pulse */}
+        <View style={styles.dashboardSection}>{pulseWidget}</View>
       </Animated.View>
     </ScreenShell>
   );
@@ -575,10 +706,11 @@ function WidgetCard({
         {
           borderColor: theme.cardBorder,
         },
-      ]}>
+      ]}
+    >
       <View style={styles.widgetHeader}>
         <View style={[styles.widgetIcon, { backgroundColor: `${accent}22` }]}>
-           <SymbolView name={icon as any} size={16} tintColor={accent} />
+          <SymbolView name={icon as any} size={16} tintColor={accent} />
         </View>
         <ThemedText type="cardTitle">{title}</ThemedText>
       </View>
@@ -607,7 +739,8 @@ function AgendaRow({
           backgroundColor: theme.backgroundElement,
           borderColor: theme.cardBorder,
         },
-      ]}>
+      ]}
+    >
       <View style={[styles.agendaDot, { backgroundColor: theme.primary }]} />
       <View style={{ flex: 1 }}>
         <ThemedText type="body" numberOfLines={1}>
@@ -617,7 +750,11 @@ function AgendaRow({
           {meta}
         </ThemedText>
       </View>
-      <SymbolView name={{ ios: "chevron.right", android: "chevron_right" }} size={16} tintColor={theme.textSecondary} />
+      <SymbolView
+        name={{ ios: "chevron.right", android: "chevron_right" }}
+        size={16}
+        tintColor={theme.textSecondary}
+      />
     </Pressable>
   );
 }
@@ -630,145 +767,174 @@ function EmptyState({ copy }: { copy: string }) {
   );
 }
 
+function SectionHeading({
+  title,
+  icon,
+  accent,
+  onViewAll,
+}: {
+  title: string;
+  icon: WidgetIcon;
+  accent: string;
+  onViewAll: () => void;
+}) {
+  const theme = useTheme();
+
+  return (
+    <View style={styles.sectionHeading}>
+      <View style={[styles.sectionIcon, { backgroundColor: `${accent}22` }]}>
+        <SymbolView name={icon as any} size={23} tintColor={accent} />
+      </View>
+      <ThemedText type="cardTitle" style={styles.sectionTitle}>
+        {title}
+      </ThemedText>
+      <Pressable onPress={onViewAll} style={styles.viewAllButton}>
+        <ThemedText type="caption" themeColor="textSecondary">
+          View all
+        </ThemedText>
+        <SymbolView
+          name={{ ios: "chevron.right", android: "chevron_right" }}
+          size={16}
+          tintColor={theme.textSecondary}
+        />
+      </Pressable>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
-    gap: Spacing.three,
+    gap: 22,
+    paddingBottom: 20,
   },
   hero: {
-    gap: Spacing.three,
+    gap: 24,
   },
   topRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    gap: Spacing.two,
+    gap: 8,
   },
   intentHomeButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    borderWidth: 1,
+    gap: 10,
     borderRadius: 999,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderWidth: 1,
+    elevation: 2,
   },
   heroHeading: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
-    gap: Spacing.two,
+    gap: 12,
   },
   heroCopy: {
     flex: 1,
-    gap: 4,
+    gap: 6,
   },
   heroBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
     borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: 10,
+    borderRadius: 24,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
   },
   captureBar: {
     borderWidth: 1,
-    borderRadius: 24,
+    borderRadius: 30,
     padding: 6,
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.two,
+    gap: 8,
+    minHeight: 66,
+    backgroundColor: "#FFFFFF",
   },
   captureInput: {
     flex: 1,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: 10,
-    fontSize: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
   },
   captureButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 18,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: "center",
     justifyContent: "center",
   },
-  focusBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.two,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: 10,
-  },
-  loadingWrap: {
-    paddingVertical: Spacing.five,
-    alignItems: "center",
-  },
-  errorCard: {
-    padding: Spacing.three,
-    borderRadius: 20,
-    gap: Spacing.one,
-  },
   widgetGrid: {
-    gap: Spacing.three,
+    flexDirection: "column",
+    gap: 14,
+    width: "100%",
   },
   widgetCard: {
+    width: "48%",
+    flexGrow: 1,
+    flexBasis: "45%",
     borderRadius: 28,
     borderWidth: 1,
-    padding: Spacing.three,
-    gap: Spacing.three,
+    padding: 16,
+    gap: 14,
+    backgroundColor: "#FFFFFF",
   },
   largeCard: {
-    minHeight: 170,
+    width: "100%",
+    alignSelf: "stretch",
+    minHeight: 145,
   },
   widgetHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.two,
+    gap: 12,
   },
   widgetIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 12,
+    width: 46,
+    height: 46,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },
   widgetBody: {
-    gap: Spacing.two,
+    gap: 10,
   },
   agendaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.two,
+    gap: 10,
     borderRadius: 18,
     borderWidth: 1,
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: 12,
     paddingVertical: 12,
   },
-  agendaDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 999,
+
+  dashboardSection: {
+    gap: 14,
   },
-  focusBody: {
-    gap: Spacing.two,
-  },
-  progressTrack: {
-    height: 6,
-    borderRadius: 999,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    borderRadius: 999,
-  },
-  continueCard: {
-    gap: Spacing.two,
-  },
-  continueHeader: {
+  sectionHeading: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.two,
+    gap: 14,
+    minHeight: 58,
+  },
+  sectionIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sectionTitle: {
+    flex: 1,
+  },
+  viewAllButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
 });
